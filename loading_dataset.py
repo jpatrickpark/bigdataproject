@@ -28,7 +28,7 @@ def string_metadata(df, string_cols, name):
 		query = "SELECT {} as col_value, count(*) as cnt FROM {} GROUP BY {}".format(col, df, col) 
 		x = spark.sql(query)
 		y = x.select(f.format_string('%s\t%.2f, %.2f',col, x.col_value, x.cnt))
-		x.coalesce(1).write.mode("append").csv(name)
+		y.coalesce(1).write.mode("append").csv(name)
 
 if __name__ == "__main__":
 	spark = spark = SparkSession.builder.appName("task7-sql").config("spark.some.config.option", "some-value").getOrCreate()
