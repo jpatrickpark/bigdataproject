@@ -12,85 +12,82 @@ class TableCollections:
     def __init__(self,spark,sc):
         self.spark = spark
         self.sc = sc
-        self.minNums = dict()
-        self.maxNums = dict()
-        self.minTimes = dict()
-        self.maxTimes = dict()
+        self.tableNames = []
+        self.fs = self.sc._jvm.org.apache.hadoop.fs.FileSystem.get(sc._jsc.hadoopConfiguration())
 
     def register(self, df, name):
+        self.tableNames.append(name)
         numFileName = name+"_num_metadata.csv"
         timeFileName = name+"_time_metadata.csv"
-        '''
-        try:
-            numMetaRDD  = self.sc.textFile(numFileName,1)
-            timeMetaRDD = self.sc.textFile(timeFileName,1) 
-            #numDf = spark.read.format('csv').options(header='false',inferschema='true').load(numFileName)
-            #timeDf = spark.read.format('csv').options(header='false',inferschema='true').load(timeFileName)
-        except:
-            print("file does not exist; loading from scratch")
-        '''
-        for colName, dtype in df.dtypes:
-            if dtype == 'string':
-                # figure out distinct values here?
-                pass
-            elif dtype == 'timestamp':
-                minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
-                self.minTimes[name+"."+colName] = minMax[0]
-                self.maxTimes[name+"."+colName] = minMax[1]
-                metaDf = self.sc.parallelize([
-                            (name,colName,"min",minMax[0].strftime("%Y-%m-%d %H:%M:%S")),
-                            (name,colName,"max",minMax[1].strftime("%Y-%m-%d %H:%M:%S"))]).toDF(["dbName","colName","metadata","value"])
-                metaDf.select(f.format_string('%s, %s, %s, %s', metaDf.dbName, metaDf.colName, metaDf.metadata, metaDf.value)).write.save(timeFileName,mode="append",format="text")
-            else:
-                minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
-                self.minNums[name+"."+colName] = minMax[0]
-                self.maxNums[name+"."+colName] = minMax[1]
-                metaDf = self.sc.parallelize([
-                        (name,colName,"min",float(minMax[0])),
-                        (name,colName,"max",float(minMax[1]))]).toDF(["dbName","colName","metadata","value"])
-                metaDf.select(f.format_string('%s, %s, %s, %.2f', metaDf.dbName, metaDf.colName, metaDf.metadata, metaDf.value)).write.save(numFileName,mode="append",format="text")
-        '''
+        if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
+            for colName, dtype in df.dtypes:
+                if dtype != 'string' and dtype != 'timestamp':
+                    minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
+                    #self.minNums[name+"."+colName] = minMax[0]
+                    #self.maxNums[name+"."+colName] = minMax[1]
+                    metaDf = self.sc.parallelize([
+                        (colName,float(minMax[0]),float(minMax[1]))]).toDF(["colName","min","max"])
+                    metaDf.write.save(path=numFileName, format='csv', mode='append', sep=',')
         else:
-            print("metadata found; processing from metadata")
-            for row in numMetaRDD:
-                if row[2] == "max":
-                    self.maxNums[row[0]+"."+row[1]] = float(row[3])
-                else:
-                    self.minNums[row[0]+"."+row[1]] = float(row[3])
-            for row in timeMetaRDD:
-                if row[2] == "max":
-                    self.maxTimes[row[0]+"."+row[1]] = datetime.strptime(row[3], "%Y-%m-%d %H:%M:%S")
-                else:
-                    self.minTimes[row[0]+"."+row[1]] = datetime.strptime(row[3], "%Y-%m-%d %H:%M:%S")
-                    #self.minTimes[row[0]+"."+row[1]] = row[3]
-        '''
+            print("file exists")
+        if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)):
+            for colName, dtype in df.dtypes:
+                if dtype == 'timestamp':
+                    minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
+                    #self.minTimes[name+"."+colName] = minMax[0]
+                    #self.maxTimes[name+"."+colName] = minMax[1]
+                    metaDf = self.sc.parallelize([
+                            (colName,minMax[0].strftime("%Y-%m-%d %H:%M:%S"),minMax[1].strftime("%Y-%m-%d %H:%M:%S"))]).toDF(["colName","min","max"])
+                    metaDf.write.save(path=timeFileName, format='csv', mode='append', sep=',')
+
     def timeColWithinRange(self, minTime, maxTime):
-        result = []
+        resultCreated = False
         if type(minTime) != datetime.datetime or type(maxTime) != datetime.datetime:
             raise TypeError("minNum, maxNum must be timestamp")
-        # Figure out a way to return the result as DataFrame.
-        # I can save a csv for each dataframe. 
-        # columns will be (colName, min, max)
-        for key, val in self.minTimes.items():
-            if type(val) == datetime.datetime:
-                if minTime < val and self.maxTimes[key] < maxTime:
-                    result.append(key)
-        # create spark dataframe here
-        return result
+        
+        for each in self.tableNames:
+            filename = each + '_time_metadata.csv'
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                currentTable = spark.read.format('csv').options(header='false',inferschema='true').load(filename)
+                oldColumns = currentTable.schema.names
+                newColumns = ["colName","min","max"]
+                currentTable = reduce(lambda currentTable, idx: currentTable.withColumnRenamed(oldColumns[idx], newColumns[idx]), range(len(oldColumns)), currentTable)
+                if not resultCreated:
+                    resultDf = currentTable.where(currentTable.min>minTime).where(currentTable.max<maxTime).select(currentTable.colName)
+                    resultCreated = True
+                else:
+                    resultDf = resultDf.union(currentTable.where(currentTable.min>minTime).where(currentTable.max<maxTime).select(currentTable.colName))
+
+        return resultDf
 
     def numColWithinRange(self, minNum, maxNum):
         # int, bigint, float, long
+        resultCreated = False
         if type(minNum) == datetime.datetime or \
             type(minNum) == str or \
             type(maxNum) == datetime.datetime or \
             type(maxNum) == str:
             raise TypeError("minNum, maxNum must be number")
+        for each in self.tableNames:
+            filename = each + '_num_metadata.csv'
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                currentTable = spark.read.format('csv').options(header='false',inferschema='true').load(filename)
+                oldColumns = currentTable.schema.names
+                newColumns = ["colName","min","max"]
+                currentTable = reduce(lambda currentTable, idx: currentTable.withColumnRenamed(oldColumns[idx], newColumns[idx]), range(len(oldColumns)), currentTable)
+                if not resultCreated:
+                    resultDf = currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName)
+                    resultCreated = True
+                else:
+                    resultDf = resultDf.union(currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName))
+        '''
         result = []
         for key, val in self.minNums.items():
             if minNum < val and self.maxNums[key] < maxNum:
                 result.append(key)
         # create spark dataframe here
-        return result
+        '''
+        return resultDf
 
 
 spark = SparkSession \
@@ -107,6 +104,6 @@ tc = TableCollections(spark, sc)
 tc.register(openTable, "open")
 tc.register(parkingTable, "parking")
 #['parking.summons_number', 'open.fine_amount', 'open.summons_number', 'parking.violation_code']
-print(tc.numColWithinRange(0, 1000000000000))
+tc.numColWithinRange(0, 1000000000000).show()
 #['parking.issue_date']
-print(tc.timeColWithinRange(datetime.datetime(1994,1,1), datetime.datetime(2018,5,1)))
+tc.timeColWithinRange(datetime.datetime(1994,1,1), datetime.datetime(2018,5,1)).show()
