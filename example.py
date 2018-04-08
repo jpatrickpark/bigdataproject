@@ -9,14 +9,21 @@ from collections import defaultdict
 import datetime
 
 class TableCollections:
-    def __init__(self,spark):
+    def __init__(self,spark,sc):
         self.spark = spark
+        self.sc = sc
         self.minNums = dict()
         self.maxNums = dict()
         self.minTimes = dict()
         self.maxTimes = dict()
 
     def register(self, df, name):
+        #numMinFileName = name+"_num_min.csv"
+        #numMaxFileName = name+"_num_max.csv"
+        #timeMinFileName = name+"_time_min.csv"
+        #timeMaxFileName = name+"_time_max.csv"
+        numericFileName = name+"_numeric_metadata.csv"
+        timeFileName = name+"_time_metadata.csv"
         for colName, dtype in df.dtypes:
             if dtype == 'string':
                 # figure out distinct values here?
@@ -25,6 +32,17 @@ class TableCollections:
                 minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
                 self.minTimes[name+"."+colName] = minMax[0]
                 self.maxTimes[name+"."+colName] = minMax[1]
+                #minDf = self.spark.createDataFrame([(minMax[0].strftime("%Y-%m-%d %H:%M:%S"))],["min"])
+                #maxDf = self.spark.createDataFrame([(minMax[1].strftime("%Y-%m-%d %H:%M:%S"))],["max"])
+                metaDf = self.sc.parallelize([
+                        (name,colName,"min",minMax[0].strftime("%Y-%m-%d %H:%M:%S")),
+                        (name,colName,"max",minMax[1].strftime("%Y-%m-%d %H:%M:%S"))]).toDF(["dbName","colName","metadata","value"])
+                
+                metaDf.select(f.format_string('%s, %s, %s, %s', metaDf.dbName, metaDf.colName, metaDf.metadata, metaDf.value)).write.save(timeFileName,mode="append",format="text")
+                #maxDf = self.sc.createDataFrame([(minMax[1].strftime("%Y-%m-%d %H:%M:%S"))],["max"])
+                #minDf.select(f.format_string(name+', '+colName+', min, %s', f.date_format(minDf.min,'yyyy-MM-dd HH:mm:ss'))).write.save(timeFileName,mode="append",format="text")
+                #maxDf.select(f.format_string(name+', '+colName+', max, %s', f.date_format(minDf.max,'yyyy-MM-dd HH:mm:ss'))).write.save(timeFileName,mode="append",format="text")
+                #maxDf.select(f.format_string(name+', '+colName+', max, %s', minDf.max)).write.save(timeFileName,mode="append",format="text")
             else:
                 minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
                 self.minNums[name+"."+colName] = minMax[0]
@@ -69,7 +87,7 @@ sc = spark.sparkContext
 parkingTable = spark.read.format('csv').options(header='true',inferschema='true').load(sys.argv[1])
 openTable = spark.read.format('csv').options(header='true',inferschema='true').load(sys.argv[2])
 
-tc = TableCollections(spark)
+tc = TableCollections(spark, sc)
 tc.register(openTable, "open")
 tc.register(parkingTable, "parking")
 #['parking.summons_number', 'open.fine_amount', 'open.summons_number', 'parking.violation_code']
