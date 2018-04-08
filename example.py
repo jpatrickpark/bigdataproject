@@ -4,12 +4,13 @@ import sys
 import string
 from csv import reader
 from functools import reduce
-from pyspark.sql.functions import *
+from pyspark.sql import functions as f
 from collections import defaultdict
 import datetime
 
 class TableCollections:
-    def __init__(self):
+    def __init__(self,spark):
+        self.spark = spark
         self.minNums = dict()
         self.maxNums = dict()
         self.minTimes = dict()
@@ -21,11 +22,13 @@ class TableCollections:
                 # figure out distinct values here?
                 pass
             elif dtype == 'timestamp':
-                self.minTimes[name+"."+colName] = df.agg({colName: "min"}).collect()[0][0]
-                self.maxTimes[name+"."+colName] = df.agg({colName: "max"}).collect()[0][0]
+                minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
+                self.minTimes[name+"."+colName] = minMax[0]
+                self.maxTimes[name+"."+colName] = minMax[1]
             else:
-                self.minNums[name+"."+colName] = df.agg({colName: "min"}).collect()[0][0]
-                self.maxNums[name+"."+colName] = df.agg({colName: "max"}).collect()[0][0]
+                minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
+                self.minNums[name+"."+colName] = minMax[0]
+                self.maxNums[name+"."+colName] = minMax[1]
 
     def timeColWithinRange(self, minTime, maxTime):
         result = []
@@ -66,7 +69,7 @@ sc = spark.sparkContext
 parkingTable = spark.read.format('csv').options(header='true',inferschema='true').load(sys.argv[1])
 openTable = spark.read.format('csv').options(header='true',inferschema='true').load(sys.argv[2])
 
-tc = TableCollections()
+tc = TableCollections(spark)
 tc.register(openTable, "open")
 tc.register(parkingTable, "parking")
 #['parking.summons_number', 'open.fine_amount', 'open.summons_number', 'parking.violation_code']
