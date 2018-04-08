@@ -2,9 +2,10 @@ import sys
 from pyspark import SparkContext
 from csv import reader
 from pyspark.sql import SparkSession, Row, functions as f
-from pyspark.sql.functions import udf
+from pyspark.sql.functions import udf, lit
 from datetime import datetime,date,timedelta
 from pyspark.sql.types import StringType
+
 
 #register the dataset
 def register(file_path, name):
@@ -27,14 +28,11 @@ def string_metadata(df, string_cols, name):
 	for col in string_cols:
 		query = "SELECT {} as col_value, count(*) as cnt FROM {} GROUP BY {}".format(col, df, col) 
 		x = spark.sql(query)
-		y = x.select(f.format_string(col+'\t%.2f, %.2f', x.col_value, x.cnt))
-		y = x.select(f.format_string(col+', %s, %d', x.col_value, x.cnt))
-		y.coalesce(1).write.mode("append").csv(name).write.mode("append").save(name,format="text")
+        x = x.withColumn("col_name", lit(col))
+		x.coalesce(1).write.save(path = name, header= "true", mode = "append", format = "com.databricks.spark.csv", sep = '^')
 
 if __name__ == "__main__":
 	spark = spark = SparkSession.builder.appName("task7-sql").config("spark.some.config.option", "some-value").getOrCreate()
 	name = sys.argv[2]
 	file_path = sys.argv[1]
 	register(file_path, name)
-
-
