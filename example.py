@@ -17,28 +17,44 @@ class TableCollections:
 
     def register(self, df, name):
         self.tableNames.append(name)
-        numFileName = name+"_num_metadata.csv"
-        timeFileName = name+"_time_metadata.csv"
+        numFileName = name + "_num_metadata.csv"
+        timeFileName = name + "_time_metadata.csv"
+        stringFileName = name + "_string_metadata.csv"
+        string_cols = []
+        df.createOrReplaceTempView(name) # can be problematic
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
             for colName, dtype in df.dtypes:
                 if dtype != 'string' and dtype != 'timestamp':
                     minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
-                    #self.minNums[name+"."+colName] = minMax[0]
-                    #self.maxNums[name+"."+colName] = minMax[1]
                     metaDf = self.sc.parallelize([
                         (colName,float(minMax[0]),float(minMax[1]))]).toDF(["colName","min","max"])
-                    metaDf.write.save(path=numFileName, format='csv', mode='append', sep=',')
+                    metaDf.write.save(path=numFileName, header="true", format='csv', mode='append', sep = '^')
         else:
-            print("file exists")
+            print("num metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)):
             for colName, dtype in df.dtypes:
                 if dtype == 'timestamp':
                     minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
-                    #self.minTimes[name+"."+colName] = minMax[0]
-                    #self.maxTimes[name+"."+colName] = minMax[1]
                     metaDf = self.sc.parallelize([
                             (colName,minMax[0].strftime("%Y-%m-%d %H:%M:%S"),minMax[1].strftime("%Y-%m-%d %H:%M:%S"))]).toDF(["colName","min","max"])
-                    metaDf.write.save(path=timeFileName, format='csv', mode='append', sep=',')
+                    metaDf.write.save(path=timeFileName, header="true", format='csv', mode='append', sep = '^')
+        else:
+            print("timestamp metadata file exists for table {}".format(name))
+        if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
+            for colName, dtype in df.dtypes:
+                if dtype == 'string':
+                    string_cols.append(colName)
+            self.createStringMetadata(name, string_cols)
+        else:
+            print("timestamp metadata file exists for table {}".format(name))
+
+    def createStringMetadata(self, df, string_cols):
+        name = df + '_string_metadata.csv'
+        for col in string_cols:
+            query = "SELECT {} as col_value, count(*) as cnt FROM {} GROUP BY {}".format(col, df, col) 
+            x = self.spark.sql(query)
+            x = x.withColumn("col_name", f.lit(col))
+            x.coalesce(1).write.save(path = name, header= "true", mode = "append", format = "com.databricks.spark.csv", sep = '^')
 
     def timeColWithinRange(self, minTime, maxTime):
         resultCreated = False
@@ -48,7 +64,7 @@ class TableCollections:
         for each in self.tableNames:
             filename = each + '_time_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = spark.read.format('csv').options(header='false',inferschema='true').load(filename)
+                currentTable = spark.read.format('csv').options(header='false',inferschema='true', sep = '^').load(filename)
                 oldColumns = currentTable.schema.names
                 newColumns = ["colName","min","max"]
                 currentTable = reduce(lambda currentTable, idx: currentTable.withColumnRenamed(oldColumns[idx], newColumns[idx]), range(len(oldColumns)), currentTable)
@@ -71,7 +87,7 @@ class TableCollections:
         for each in self.tableNames:
             filename = each + '_num_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = spark.read.format('csv').options(header='false',inferschema='true').load(filename)
+                currentTable = spark.read.format('csv').options(header='false',inferschema='true', sep = '^').load(filename)
                 oldColumns = currentTable.schema.names
                 newColumns = ["colName","min","max"]
                 currentTable = reduce(lambda currentTable, idx: currentTable.withColumnRenamed(oldColumns[idx], newColumns[idx]), range(len(oldColumns)), currentTable)
