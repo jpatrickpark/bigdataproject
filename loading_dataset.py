@@ -28,7 +28,7 @@ def string_metadata(df, string_cols, name):
 	for col in string_cols:
 		query = "SELECT {} as col_value, count(*) as cnt FROM {} GROUP BY {}".format(col, df, col) 
 		x = spark.sql(query)
-        x = x.withColumn("col_name", lit(col))
+		x = x.withColumn("col_name", lit(col))
 		x.coalesce(1).write.save(path = name, header= "true", mode = "append", format = "com.databricks.spark.csv", sep = '^')
 
 if __name__ == "__main__":
