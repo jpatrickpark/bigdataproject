@@ -53,10 +53,10 @@ class TableCollections:
                 newColumns = ["colName","min","max"]
                 currentTable = reduce(lambda currentTable, idx: currentTable.withColumnRenamed(oldColumns[idx], newColumns[idx]), range(len(oldColumns)), currentTable)
                 if not resultCreated:
-                    resultDf = currentTable.where(currentTable.min>minTime).where(currentTable.max<maxTime).select(currentTable.colName)
+                    resultDf = currentTable.where(currentTable.min>minTime).where(currentTable.max<maxTime).select(currentTable.colName).withColumn("tableName", f.lit(each))
                     resultCreated = True
                 else:
-                    resultDf = resultDf.union(currentTable.where(currentTable.min>minTime).where(currentTable.max<maxTime).select(currentTable.colName))
+                    resultDf = resultDf.union(currentTable.where(currentTable.min>minTime).where(currentTable.max<maxTime).select(currentTable.colName).withColumn("tableName", f.lit(each)))
 
         return resultDf
 
@@ -76,17 +76,10 @@ class TableCollections:
                 newColumns = ["colName","min","max"]
                 currentTable = reduce(lambda currentTable, idx: currentTable.withColumnRenamed(oldColumns[idx], newColumns[idx]), range(len(oldColumns)), currentTable)
                 if not resultCreated:
-                    resultDf = currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName)
+                    resultDf = currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName).withColumn("tableName", f.lit(each))
                     resultCreated = True
                 else:
-                    resultDf = resultDf.union(currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName))
-        '''
-        result = []
-        for key, val in self.minNums.items():
-            if minNum < val and self.maxNums[key] < maxNum:
-                result.append(key)
-        # create spark dataframe here
-        '''
+                    resultDf = resultDf.union(currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName).withColumn("tableName",f.lit(each)))
         return resultDf
 
 
@@ -103,7 +96,5 @@ openTable = spark.read.format('csv').options(header='true',inferschema='true').l
 tc = TableCollections(spark, sc)
 tc.register(openTable, "open")
 tc.register(parkingTable, "parking")
-#['parking.summons_number', 'open.fine_amount', 'open.summons_number', 'parking.violation_code']
 tc.numColWithinRange(0, 1000000000000).show()
-#['parking.issue_date']
 tc.timeColWithinRange(datetime.datetime(1994,1,1), datetime.datetime(2018,5,1)).show()
