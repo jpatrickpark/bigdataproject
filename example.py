@@ -20,44 +20,50 @@ class TableCollections:
     def register(self, df, name):
         numFileName = name+"_num_metadata.csv"
         timeFileName = name+"_time_metadata.csv"
+        '''
         try:
-            numMetaRDD  = self.sc.textfile(numFileName,1)
-            timeMetaRDD = self.sc.textfile(timeFileName,1) 
+            numMetaRDD  = self.sc.textFile(numFileName,1)
+            timeMetaRDD = self.sc.textFile(timeFileName,1) 
             #numDf = spark.read.format('csv').options(header='false',inferschema='true').load(numFileName)
             #timeDf = spark.read.format('csv').options(header='false',inferschema='true').load(timeFileName)
         except:
-            for colName, dtype in df.dtypes:
-                if dtype == 'string':
-                    # figure out distinct values here?
-                    pass
-                elif dtype == 'timestamp':
-                    minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
-                    self.minTimes[name+"."+colName] = minMax[0]
-                    self.maxTimes[name+"."+colName] = minMax[1]
-                    metaDf = self.sc.parallelize([
+            print("file does not exist; loading from scratch")
+        '''
+        for colName, dtype in df.dtypes:
+            if dtype == 'string':
+                # figure out distinct values here?
+                pass
+            elif dtype == 'timestamp':
+                minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
+                self.minTimes[name+"."+colName] = minMax[0]
+                self.maxTimes[name+"."+colName] = minMax[1]
+                metaDf = self.sc.parallelize([
                             (name,colName,"min",minMax[0].strftime("%Y-%m-%d %H:%M:%S")),
                             (name,colName,"max",minMax[1].strftime("%Y-%m-%d %H:%M:%S"))]).toDF(["dbName","colName","metadata","value"])
-                    metaDf.select(f.format_string('%s, %s, %s, %s', metaDf.dbName, metaDf.colName, metaDf.metadata, metaDf.value)).write.save(timeFileName,mode="append",format="text")
-                else:
-                    minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
-                    self.minNums[name+"."+colName] = minMax[0]
-                    self.maxNums[name+"."+colName] = minMax[1]
-                    metaDf = self.sc.parallelize([
+                metaDf.select(f.format_string('%s, %s, %s, %s', metaDf.dbName, metaDf.colName, metaDf.metadata, metaDf.value)).write.save(timeFileName,mode="append",format="text")
+            else:
+                minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
+                self.minNums[name+"."+colName] = minMax[0]
+                self.maxNums[name+"."+colName] = minMax[1]
+                metaDf = self.sc.parallelize([
                         (name,colName,"min",float(minMax[0])),
                         (name,colName,"max",float(minMax[1]))]).toDF(["dbName","colName","metadata","value"])
-                    metaDf.select(f.format_string('%s, %s, %s, %.2f', metaDf.dbName, metaDf.colName, metaDf.metadata, metaDf.value)).write.save(numFileName,mode="append",format="text")
+                metaDf.select(f.format_string('%s, %s, %s, %.2f', metaDf.dbName, metaDf.colName, metaDf.metadata, metaDf.value)).write.save(numFileName,mode="append",format="text")
+        '''
         else:
+            print("metadata found; processing from metadata")
             for row in numMetaRDD:
                 if row[2] == "max":
                     self.maxNums[row[0]+"."+row[1]] = float(row[3])
                 else:
                     self.minNums[row[0]+"."+row[1]] = float(row[3])
-
-            #newColumns = ["dbName","colName","metadata","value"]
-            #oldColumns = numDf.schema.names
-            #numDf = reduce(lambda numDf, idx:numDf.withColumnRenamed(oldColumns[idx], newColumns[idx]), range(len(oldColumns)), numDf)
-            #oldColumns = timeDf.schema.names
-            #timeDf = reduce(lambda timeDf, idx:numDf.withColumnRenamed(oldColumns[idx], newColumns[idx]), range(len(oldColumns)), timeDf)
+            for row in timeMetaRDD:
+                if row[2] == "max":
+                    self.maxTimes[row[0]+"."+row[1]] = datetime.strptime(row[3], "%Y-%m-%d %H:%M:%S")
+                else:
+                    self.minTimes[row[0]+"."+row[1]] = datetime.strptime(row[3], "%Y-%m-%d %H:%M:%S")
+                    #self.minTimes[row[0]+"."+row[1]] = row[3]
+        '''
     def timeColWithinRange(self, minTime, maxTime):
         result = []
         if type(minTime) != datetime.datetime or type(maxTime) != datetime.datetime:
@@ -103,4 +109,4 @@ tc.register(parkingTable, "parking")
 #['parking.summons_number', 'open.fine_amount', 'open.summons_number', 'parking.violation_code']
 print(tc.numColWithinRange(0, 1000000000000))
 #['parking.issue_date']
-#print(tc.timeColWithinRange(datetime.datetime(1994,1,1), datetime.datetime(2018,5,1)))
+print(tc.timeColWithinRange(datetime.datetime(1994,1,1), datetime.datetime(2018,5,1)))
