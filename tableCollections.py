@@ -64,7 +64,7 @@ class TableCollections:
         for each in self.tableNames:
             filename = each + '_time_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
+                currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
                 if not resultCreated:
                     resultDf = currentTable.where(currentTable.min>minTime).where(currentTable.max<maxTime).select(currentTable.colName).withColumn("tableName", f.lit(each))
                     resultCreated = True
@@ -84,27 +84,10 @@ class TableCollections:
         for each in self.tableNames:
             filename = each + '_num_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
+                currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
                 if not resultCreated:
                     resultDf = currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName).withColumn("tableName", f.lit(each))
                     resultCreated = True
                 else:
                     resultDf = resultDf.union(currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName).withColumn("tableName",f.lit(each)))
         return resultDf
-
-
-spark = SparkSession \
-                .builder \
-                .appName("TableCollections") \
-                .config("spark.some.config.option", "some-value") \
-                .getOrCreate()
-sc = spark.sparkContext
-
-parkingTable = spark.read.format('csv').options(header='true',inferschema='true').load(sys.argv[1])
-openTable = spark.read.format('csv').options(header='true',inferschema='true').load(sys.argv[2])
-
-tc = TableCollections(spark, sc)
-tc.register(openTable, "open")
-tc.register(parkingTable, "parking")
-tc.numColWithinRange(0, 1000000000000).show()
-tc.timeColWithinRange(datetime.datetime(1994,1,1), datetime.datetime(2018,5,1)).show()
