@@ -1,0 +1,1 @@
+open, reduction_amount, min, 0.00

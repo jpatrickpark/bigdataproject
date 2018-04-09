@@ -1,0 +1,17 @@
+col_value^cnt^col_name
+HOUSING AUTHORITY^3^issuing_agency
+FIRE DEPARTMENT^20^issuing_agency
+NYS COURT OFFICERS^23^issuing_agency
+PORT AUTHORITY^24^issuing_agency
+BOARD OF ESTIMATE^2^issuing_agency
+PARKS DEPARTMENT^61^issuing_agency
+TRIBOROUGH BRIDGE AND TUNNEL POLICE^12^issuing_agency
+CON RAIL^19^issuing_agency
+DEPARTMENT OF SANITATION^11461^issuing_agency
+POLICE DEPARTMENT^32710^issuing_agency
+TRAFFIC^229574^issuing_agency
+TRANSIT AUTHORITY^38^issuing_agency
+DEPARTMENT OF TRANSPORTATION^55163^issuing_agency
+DEPARTMENT OF BUSINESS SERVICES^9^issuing_agency
+OTHER/UNKNOWN AGENCIES^504^issuing_agency
+NYC TRANSIT AUTHORITY MANAGERS^7^issuing_agency

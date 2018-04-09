@@ -1,0 +1,1 @@
+open, precinct, min, 0.00

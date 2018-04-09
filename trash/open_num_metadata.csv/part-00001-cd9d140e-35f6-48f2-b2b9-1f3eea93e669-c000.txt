@@ -1,0 +1,1 @@
+open, reduction_amount, max, 545.00
