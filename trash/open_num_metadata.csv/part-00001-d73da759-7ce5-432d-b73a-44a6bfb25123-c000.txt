@@ -1,0 +1,1 @@
+open, precinct, max, 805.00

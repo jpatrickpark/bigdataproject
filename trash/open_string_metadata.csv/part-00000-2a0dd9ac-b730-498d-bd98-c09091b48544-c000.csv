@@ -1,0 +1,15 @@
+col_value^cnt^col_name
+HEARING PENDING^852^violation_status
+APPEAL ABANDONED^144^violation_status
+^252983^violation_status
+APPEAL REVERSED^277^violation_status
+HEARING ADJOURNMENT^1504^violation_status
+APPEAL AFFIRMED^1165^violation_status
+ADMIN REDUCTION^491^violation_status
+HEARING HELD-NOT GUILTY^19802^violation_status
+HEARING HELD-GUILTY^47033^violation_status
+ADMIN CLAIM DENIED^300^violation_status
+HEARING HELD-GUILTY REDUCTION^4341^violation_status
+APPEAL MODIFIED^15^violation_status
+HEARING HELD-REINSTATEMENT^20^violation_status
+ADMIN CLAIM GRANTED^703^violation_status

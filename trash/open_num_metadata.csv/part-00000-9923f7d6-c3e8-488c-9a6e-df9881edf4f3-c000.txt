@@ -1,0 +1,1 @@
+open, payment_amount, min, 0.00

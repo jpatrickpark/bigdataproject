@@ -1,0 +1,1 @@
+parking, issuer_precinct, max, 992.00

@@ -1,0 +1,1 @@
+open, penalty_amount, min, 0.00

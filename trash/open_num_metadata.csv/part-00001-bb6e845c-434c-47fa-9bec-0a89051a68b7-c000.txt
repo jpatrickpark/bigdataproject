@@ -1,0 +1,1 @@
+open, penalty_amount, max, 60.00

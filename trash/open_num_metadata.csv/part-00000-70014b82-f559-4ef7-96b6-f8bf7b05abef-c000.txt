@@ -1,0 +1,1 @@
+open, fine_amount, min, 25.00
