@@ -46,7 +46,7 @@ class TableCollections:
                     string_cols.append(colName)
             self.createStringMetadata(name, string_cols)
         else:
-            print("timestamp metadata file exists for table {}".format(name))
+            print("string metadata file exists for table {}".format(name))
 
     def createStringMetadata(self, df, string_cols):
         name = df + '_string_metadata.csv'
