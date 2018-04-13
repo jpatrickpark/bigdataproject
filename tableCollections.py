@@ -51,7 +51,7 @@ class TableCollections:
     def createStringMetadata(self, df, string_cols):
         name = df + '_string_metadata.csv'
         for col in string_cols:
-            query = "SELECT {} as col_value, count(*) as cnt FROM {} GROUP BY {}".format(col, df, col) 
+            query = "SELECT {} as col_value, count(*) as cnt FROM {} GROUP BY {}".format(col, df, col)
             x = self.spark.sql(query)
             x = x.withColumn("col_name", f.lit(col))
             x.coalesce(1).write.save(path = name, header= "true", mode = "append", format = "com.databricks.spark.csv", sep = '^')
@@ -60,7 +60,7 @@ class TableCollections:
         resultCreated = False
         if type(minTime) != datetime.datetime or type(maxTime) != datetime.datetime:
             raise TypeError("minNum, maxNum must be timestamp")
-        
+
         for each in self.tableNames:
             filename = each + '_time_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
@@ -91,3 +91,21 @@ class TableCollections:
                 else:
                     resultDf = resultDf.union(currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName).withColumn("tableName",f.lit(each)))
         return resultDf
+
+    def returnIntersecWithinCols(self,colList):
+        resultCreated = False
+        # colList element format: tableName^colName
+        for each in colList:
+            tableName, colName = each.split('^',1);
+            filename = tableName + '_string_metadata.csv'
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
+                if not resultCreated:
+                    newDf = currentTable.where(currentTable.col_name==colName)
+                    resultCreated = True
+                else:
+                    newDf = newDf.union(currentTable.where(currentTable.col_name==colName))
+        resultDf = newDf.groupBy(newDf.col_value).count()
+        resultDf = resultDf.filter(resultDf["count"] == len(colList))
+        return resultDf
+    
