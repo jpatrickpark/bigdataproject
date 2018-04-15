@@ -16,42 +16,60 @@ class TableCollections:
         self.fs = self.sc._jvm.org.apache.hadoop.fs.FileSystem.get(sc._jsc.hadoopConfiguration())
 
     def register(self, df, name):
+        # Clean up column names so that we can prevent future errors
+        for colName, dtype in df.dtypes:
+            if '.' in colName or '`' in colName or colName.strip() != colName:
+                df = df.withColumnRenamed(colName, colName.strip().replace(".", "").replace("`", ""))
+
+        # track down which tables have been registered to the class
         self.tableNames.append(name)
         numFileName = name + "_num_metadata.csv"
         timeFileName = name + "_time_metadata.csv"
         stringFileName = name + "_string_metadata.csv"
-        string_cols = []
+        num_cols, time_cols, string_cols = [], [], []
         df.createOrReplaceTempView(name) # can be problematic
+
+        # put column names into appropriate bin
+        for colName, dtype in df.dtypes:
+            if dtype == 'timestamp':
+                time_cols.append(colName)
+            elif dtype == 'string':
+                string_cols.append(colName)
+            else:
+                num_cols.append(colName)
+
+        # For each datatype of columns, process metadata
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
-            for colName, dtype in df.dtypes:
-                if dtype != 'string' and dtype != 'timestamp':
-                    minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
-                    metaDf = self.sc.parallelize([
-                        (colName,float(minMax[0]),float(minMax[1]))]).toDF(["colName","min","max"])
-                    metaDf.write.save(path=numFileName, header="true", format='csv', mode='append', sep = '^')
+            self.createNumMetadata(df, num_cols, numFileName)
         else:
             print("num metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)):
-            for colName, dtype in df.dtypes:
-                if dtype == 'timestamp':
-                    minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
-                    metaDf = self.sc.parallelize([
-                            (colName,minMax[0].strftime("%Y-%m-%d %H:%M:%S"),minMax[1].strftime("%Y-%m-%d %H:%M:%S"))]).toDF(["colName","min","max"])
-                    metaDf.write.save(path=timeFileName, header="true", format='csv', mode='append', sep = '^')
+            self.createTimeMetadata(df, time_cols, timeFileName)
         else:
             print("timestamp metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
-            for colName, dtype in df.dtypes:
-                if dtype == 'string':
-                    string_cols.append(colName)
             self.createStringMetadata(name, string_cols)
         else:
             print("string metadata file exists for table {}".format(name))
 
+    def createTimeMetadata(self, df, time_cols, timeFileName):
+        for colName in time_cols:
+            minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
+            metaDf = self.sc.parallelize([
+                    (colName,minMax[0].strftime("%Y-%m-%d %H:%M:%S"),minMax[1].strftime("%Y-%m-%d %H:%M:%S"))]).toDF(["colName","min","max"])
+            metaDf.write.save(path=timeFileName, header="true", format='csv', mode='append', sep = '^')
+
+    def createNumMetadata(self, df, num_cols, numFileName):
+        for colName in num_cols:
+            minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
+            metaDf = self.sc.parallelize([
+                     (colName,float(minMax[0]),float(minMax[1]))]).toDF(["colName","min","max"])
+            metaDf.write.save(path=numFileName, header="true", format='csv', mode='append', sep = '^')
+
     def createStringMetadata(self, df, string_cols):
         name = df + '_string_metadata.csv'
         for col in string_cols:
-            query = "SELECT {} as col_value, count(*) as cnt FROM {} GROUP BY {}".format(col, df, col)
+            query = "SELECT `{}` as col_value, count(*) as cnt FROM {} GROUP BY `{}`".format(col, df, col)
             x = self.spark.sql(query)
             x = x.withColumn("col_name", f.lit(col))
             x.coalesce(1).write.save(path = name, header= "true", mode = "append", format = "com.databricks.spark.csv", sep = '^')
