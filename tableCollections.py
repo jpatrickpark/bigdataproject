@@ -145,3 +145,30 @@ class TableCollections:
                     newDf = newDf.union(currentTable.where(currentTable.col_name==colName))
         resultDf = newDf.sort(f.desc("cnt")).limit(topN)
         return resultDf
+
+    # A function that takes two lists of column values list A and list B as
+    # input and returns a list of table_name, column_name of columns where all
+    # the elements in A are present but any of the elements in B are not present.
+    def colsWithAndWithout(self, colList, withList, withoutList):
+        result = []
+        for each in colList:
+            tableName, colName = each.split('^', 1)
+            filename = tableName + '_string_metadata.csv'
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
+                newDf = currentTable.where(currentTable.col_name==colName)
+
+                # check if any excluding words are in the column
+                if len(newDf.filter(f.col('col_value').isin(withoutList)).head(1)) == 0:
+                    # check if all including words are in the column
+                    withCnt = 0
+                    for word in withList:
+                        if newDf.filter(newDf.col_value == word).count() > 0:
+                            withCnt += 1
+                    if withCnt == len(withList):
+                        result.append(each)
+        if len(result) == 0:
+            print("There are no columns that satisfies the condition")
+        else:
+            print("tablename^columname that satisfies the condition are: ")
+            print(*result, sep = ", ")
