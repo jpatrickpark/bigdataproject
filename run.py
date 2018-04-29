@@ -27,3 +27,4 @@ if __name__ == '__main__':
     tc.timeColWithinRange(datetime.datetime(1994,1,1), datetime.datetime(2018,5,1)).show()
     columns = ["parking^plate_id", "open^plate"]
     tc.returnIntersecWithinCols(columns).show()
+    tc.frequentVals(columns, 10).show()
