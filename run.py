@@ -25,5 +25,11 @@ if __name__ == '__main__':
     tc.register(parkingTable, "parking")
     tc.numColWithinRange(0, 1000000000000).show()
     tc.timeColWithinRange(datetime.datetime(1994,1,1), datetime.datetime(2018,5,1)).show()
-    columns = ["parking^plate_id", "open^plate"]
-    tc.returnIntersecWithinCols(columns).show()
+
+    columnsA = ["parking^plate_id", "open^plate"]
+    tc.returnIntersecWithinCols(columnsA).show()
+    tc.frequentVals(columnsA, 10).show()
+
+    columnsB = ["parking^vehicle_color", "parking^vehicle_make"]
+    tc.colsWithAndWithout(columnsB, ["FORD"], ["GREEN"]) ## returns parking^vehicle_make
+    tc.colsWithAndWithout(columnsB, ["FORD", "TOYOTA"], ["GREEN"]) ## returns empty result ("TOYOT" is in the column but not "TOYOTA")
