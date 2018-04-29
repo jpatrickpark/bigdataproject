@@ -126,4 +126,22 @@ class TableCollections:
         resultDf = newDf.groupBy(newDf.col_value).count()
         resultDf = resultDf.filter(resultDf["count"] == len(colList))
         return resultDf
-    
+
+    # A function that takes a list of columns and an integer N as input and
+    # returns a list of N rows of column value and frequency for the top N
+    # frequent column values in each column.
+    def frequentVals(self, colList, topN):
+        resultCreated = False
+        # colList element format: tableName^colName
+        for each in colList:
+            tableName, colName = each.split('^', 1)
+            filename = tableName + '_string_metadata.csv'
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
+                if not resultCreated:
+                    newDf = currentTable.where(currentTable.col_name==colName)
+                    resultCreated = True
+                else:
+                    newDf = newDf.union(currentTable.where(currentTable.col_name==colName))
+        resultDf = newDf.sort(f.desc("cnt")).limit(topN)
+        return resultDf
