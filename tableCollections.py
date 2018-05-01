@@ -24,6 +24,8 @@ class TableCollections:
             self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)) or \
             self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
             self.tableNames.append(name)
+            return True
+        return False
         
     def register(self, df, name):
         # Clean up column names so that we can prevent future errors
