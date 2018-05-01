@@ -17,7 +17,13 @@ class TableCollections:
         self.fs = self.sc._jvm.org.apache.hadoop.fs.FileSystem.get(sc._jsc.hadoopConfiguration())
 
     def add_registered_table_name(self, name):
-        self.tableNames.append(name)
+        numFileName = name + "_num_metadata.csv"
+        timeFileName = name + "_time_metadata.csv"
+        stringFileName = name + "_string_metadata.csv"
+        if  self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)) or \
+            self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)) or \
+            self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
+            self.tableNames.append(name)
         
     def register(self, df, name):
         # Clean up column names so that we can prevent future errors
@@ -30,7 +36,7 @@ class TableCollections:
         numFileName = name + "_num_metadata.csv"
         timeFileName = name + "_time_metadata.csv"
         stringFileName = name + "_string_metadata.csv"
-        num_cols, time_cols, string_cols = [], [], []
+        num_cols, time_cols, string_cols, bool_cols = [], [], [], [] 
         df.createOrReplaceTempView(name) # can be problematic
 
         # put column names into appropriate bin
@@ -39,12 +45,15 @@ class TableCollections:
                 time_cols.append(colName)
             elif dtype == 'string':
                 string_cols.append(colName)
+            elif dtype == 'boolean':
+                bool_cols.append(colName)
             else:
                 num_cols.append(colName)
 
         # For each datatype of columns, process metadata
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
             self.createNumMetadata(df, num_cols, numFileName)
+            self.createBoolMetadata(df, bool_cols, numFileName)
         else:
             print("num metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)):
@@ -55,7 +64,14 @@ class TableCollections:
             self.createStringMetadata(name, string_cols)
         else:
             print("string metadata file exists for table {}".format(name))
-
+            
+    def createBoolMetadata(self, df, bool_cols, boolFilename):
+        for colName in bool_cols:
+            minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
+            metaDf = self.sc.parallelize([
+                    (colName,float(minMax[0]),float(minMax[1]))]).toDF(["colName","min","max"])
+            metaDf.write.save(path=boolFilename, header="false", format='csv', mode='append', sep = '^')
+            
     def createTimeMetadata(self, df, time_cols, timeFileName):
         for colName in time_cols:
             minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
