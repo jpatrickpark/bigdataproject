@@ -110,7 +110,7 @@ class TableCollections:
         for each in self.tableNames:
             filename = each + '_time_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = spark.read.csv(filename,header=False,schema=schema, sep='^')
+                currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
                 if not resultCreated:
                     resultDf = currentTable.where(currentTable.min>minTime).where(currentTable.max<maxTime).select(currentTable.colName).withColumn("tableName", f.lit(each))
                     resultCreated = True
@@ -136,7 +136,7 @@ class TableCollections:
         for each in self.tableNames:
             filename = each + '_num_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = spark.read.csv(filename,header=False,schema=schema, sep='^')
+                currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
                 if not resultCreated:
                     resultDf = currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName).withColumn("tableName", f.lit(each))
                     resultCreated = True
