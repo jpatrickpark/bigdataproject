@@ -7,6 +7,7 @@ from functools import reduce
 from pyspark.sql import functions as f
 from collections import defaultdict
 import datetime
+from pyspark.sql.types import StructType, StructField, IntegerType, DoubleType, TimestampType, StringType
 
 class TableCollections:
     def __init__(self,spark,sc):
@@ -15,6 +16,17 @@ class TableCollections:
         self.tableNames = []
         self.fs = self.sc._jvm.org.apache.hadoop.fs.FileSystem.get(sc._jsc.hadoopConfiguration())
 
+    def add_registered_table_name(self, name):
+        numFileName = name + "_num_metadata.csv"
+        timeFileName = name + "_time_metadata.csv"
+        stringFileName = name + "_string_metadata.csv"
+        if  self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)) or \
+            self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)) or \
+            self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
+            self.tableNames.append(name)
+            return True
+        return False
+        
     def register(self, df, name):
         # Clean up column names so that we can prevent future errors
         for colName, dtype in df.dtypes:
@@ -26,7 +38,7 @@ class TableCollections:
         numFileName = name + "_num_metadata.csv"
         timeFileName = name + "_time_metadata.csv"
         stringFileName = name + "_string_metadata.csv"
-        num_cols, time_cols, string_cols = [], [], []
+        num_cols, time_cols, string_cols, bool_cols = [], [], [], [] 
         df.createOrReplaceTempView(name) # can be problematic
 
         # put column names into appropriate bin
@@ -35,12 +47,15 @@ class TableCollections:
                 time_cols.append(colName)
             elif dtype == 'string':
                 string_cols.append(colName)
+            elif dtype == 'boolean':
+                bool_cols.append(colName)
             else:
                 num_cols.append(colName)
 
         # For each datatype of columns, process metadata
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
             self.createNumMetadata(df, num_cols, numFileName)
+            self.createBoolMetadata(df, bool_cols, numFileName)
         else:
             print("num metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)):
@@ -51,20 +66,28 @@ class TableCollections:
             self.createStringMetadata(name, string_cols)
         else:
             print("string metadata file exists for table {}".format(name))
-
+            
+    def createBoolMetadata(self, df, bool_cols, boolFilename):
+        for colName in bool_cols:
+            minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
+            metaDf = self.sc.parallelize([
+                    (colName,float(minMax[0]),float(minMax[1]))]).toDF(["colName","min","max"])
+            metaDf.write.save(path=boolFilename, header="false", format='csv', mode='append', sep = '^')
+            
     def createTimeMetadata(self, df, time_cols, timeFileName):
         for colName in time_cols:
             minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
             metaDf = self.sc.parallelize([
                     (colName,minMax[0].strftime("%Y-%m-%d %H:%M:%S"),minMax[1].strftime("%Y-%m-%d %H:%M:%S"))]).toDF(["colName","min","max"])
-            metaDf.write.save(path=timeFileName, header="true", format='csv', mode='append', sep = '^')
+            metaDf.write.save(path=timeFileName, header="false", format='csv', mode='append', sep = '^')
 
     def createNumMetadata(self, df, num_cols, numFileName):
+        describeTable = df[num_cols].describe().collect()
+        
         for colName in num_cols:
-            minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
             metaDf = self.sc.parallelize([
-                     (colName,float(minMax[0]),float(minMax[1]))]).toDF(["colName","min","max"])
-            metaDf.write.save(path=numFileName, header="true", format='csv', mode='append', sep = '^')
+                     (colName,float(describeTable[3][colName]),float(describeTable[4][colName]))]).toDF(["colName","min","max"])
+            metaDf.write.save(path=numFileName, header="false", format='csv', mode='append', sep = '^')
 
     def createStringMetadata(self, df, string_cols):
         name = df + '_string_metadata.csv'
@@ -78,11 +101,16 @@ class TableCollections:
         resultCreated = False
         if type(minTime) != datetime.datetime or type(maxTime) != datetime.datetime:
             raise TypeError("minNum, maxNum must be timestamp")
-
+            
+        schema = StructType([
+            StructField("colName", StringType(), True),
+            StructField("min", TimestampType(), True),
+            StructField("max", TimestampType(), True)])
+        
         for each in self.tableNames:
             filename = each + '_time_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
+                currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
                 if not resultCreated:
                     resultDf = currentTable.where(currentTable.min>minTime).where(currentTable.max<maxTime).select(currentTable.colName).withColumn("tableName", f.lit(each))
                     resultCreated = True
@@ -99,10 +127,16 @@ class TableCollections:
             type(maxNum) == datetime.datetime or \
             type(maxNum) == str:
             raise TypeError("minNum, maxNum must be number")
+            
+        schema = StructType([
+            StructField("colName", StringType(), True),
+            StructField("min", DoubleType(), True),
+            StructField("max", DoubleType(), True)])
+        
         for each in self.tableNames:
             filename = each + '_num_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
+                currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
                 if not resultCreated:
                     resultDf = currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName).withColumn("tableName", f.lit(each))
                     resultCreated = True
