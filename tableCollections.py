@@ -63,8 +63,8 @@ class TableCollections:
         else:
             print("timestamp metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
-            pass
-            #self.createStringMetadata(name, string_cols)
+            #pass
+            self.createStringMetadata(name, string_cols)
         else:
             print("string metadata file exists for table {}".format(name))
             
