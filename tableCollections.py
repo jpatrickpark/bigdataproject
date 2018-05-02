@@ -63,6 +63,7 @@ class TableCollections:
         else:
             print("timestamp metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
+            #pass
             self.createStringMetadata(name, string_cols)
         else:
             print("string metadata file exists for table {}".format(name))
@@ -143,7 +144,48 @@ class TableCollections:
                 else:
                     resultDf = resultDf.union(currentTable.where(currentTable.min>minNum).where(currentTable.max<maxNum).select(currentTable.colName).withColumn("tableName",f.lit(each)))
         return resultDf
-
+    
+    def getNumRange(self,colList):
+        resultCreated = False
+        # colList element format: tableName^colName
+        schema = StructType([
+            StructField("colName", StringType(), True),
+            StructField("min", DoubleType(), True),
+            StructField("max", DoubleType(), True)])
+        for each in colList:
+            tableName, colName = each.split('^',1)
+            filename = tableName + '_num_metadata.csv'
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
+                if not resultCreated:
+                    newDf = currentTable.where(currentTable.colName==colName).withColumn("tableName", f.lit(tableName))
+                    resultCreated = True
+                else:
+                    newDf = newDf.union(currentTable.where(currentTable.colName==colName).withColumn("tableName", f.lit(tableName)))
+        resultDf = newDf.select(["tableName","colName","min","max"])
+        return resultDf
+    
+    def getTimeRange(self, colList):
+        resultCreated = False
+        # colList element format: tableName^colName
+        schema = StructType([
+            StructField("colName", StringType(), True),
+            StructField("min", TimestampType(), True),
+            StructField("max", TimestampType(), True)])
+        for each in colList:
+            tableName, colName = each.split('^',1)
+            filename = tableName + '_time_metadata.csv'
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                #print(tableName)
+                currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
+                if not resultCreated:
+                    newDf = currentTable.where(currentTable.colName==colName).withColumn("tableName", f.lit(tableName))
+                    resultCreated = True
+                else:
+                    newDf = newDf.union(currentTable.where(currentTable.colName==colName).withColumn("tableName", f.lit(tableName)))
+        resultDf = newDf.select(["tableName","colName","min","max"])
+        return resultDf
+    
     def returnIntersecWithinCols(self,colList):
         resultCreated = False
         # colList element format: tableName^colName
