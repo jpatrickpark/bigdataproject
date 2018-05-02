@@ -63,8 +63,8 @@ class TableCollections:
         else:
             print("timestamp metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
-            #pass
-            self.createStringMetadata(name, string_cols)
+            pass
+            #self.createStringMetadata(name, string_cols)
         else:
             print("string metadata file exists for table {}".format(name))
             
@@ -185,6 +185,48 @@ class TableCollections:
                     newDf = newDf.union(currentTable.where(currentTable.colName==colName).withColumn("tableName", f.lit(tableName)))
         resultDf = newDf.select(["tableName","colName","min","max"])
         return resultDf
+    
+    def getSimilarNumCols(self, tableColName, threshold=0):
+        resultCreated = False
+        schema = StructType([
+            StructField("colName", StringType(), True),
+            StructField("min", DoubleType(), True),
+            StructField("max", DoubleType(), True)])
+        
+        tableName, colName = tableColName.split('^',1) # check for possible error? Maybe after merging functions
+        filename = tableName + '_num_metadata.csv'
+        if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+            raise LookupError("Given column does not exist!")
+        currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
+        minMax = currentTable.where(currentTable.colName == colName).collect()[0]
+        currentMin = minMax["min"]
+        currentMax = minMax["max"]
+        resultDf = None
+        for each in self.tableNames:
+            filename = each + '_num_metadata.csv'
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
+                rows = currentTable.rdd.collect()
+                for row in rows:
+                    intersection = min(row["max"], currentMax) - max(row["min"], currentMin)
+                    if intersection <= 0:
+                        continue
+                    union = max(row["max"], currentMax) - min(row["min"], currentMin)
+                    iou = intersection / union
+                    if iou <= threshold:
+                        continue
+                    if not resultCreated:
+                        resultDf = currentTable.where(currentTable.colName == row["colName"]).select(currentTable.colName).withColumn("tableName", f.lit(each)).withColumn("iou", f.lit(iou))
+                        resultCreated = True
+                    else:
+                        resultDf = resultDf.union(currentTable.where(currentTable.colName == row["colName"]).select(currentTable.colName).withColumn("tableName", f.lit(each)).withColumn("iou", f.lit(iou)))
+        if resultDf == None:
+            resultSchema = StructType([
+                StructField("tableName", StringType(), True),
+                StructField("colName", StringType(), True),
+                StructField("iou", DoubleType(), True)])
+            return self.spark.createDataFrame(self.sc.emptyRDD(), resultSchema)
+        return resultDf.sort(f.desc("iou"))
     
     def returnIntersecWithinCols(self,colList):
         resultCreated = False
