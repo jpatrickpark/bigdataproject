@@ -63,8 +63,8 @@ class TableCollections:
         else:
             print("timestamp metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
-            pass
-            #self.createStringMetadata(name, string_cols)
+            #pass
+            self.createStringMetadata(name, string_cols)
         else:
             print("string metadata file exists for table {}".format(name))
             
@@ -162,9 +162,26 @@ class TableCollections:
                     resultCreated = True
                 else:
                     newDf = newDf.union(currentTable.where(currentTable.colName==colName))
-        #resultDf = newDf.groupBy(newDf.col_value).count()
-        #resultDf = resultDf.filter(resultDf["count"] == len(colList))
-        print("test")
+        resultDf = newDf.select(["colName","min","max"])
+        return resultDf
+    
+    def getTimeRange(self, colList):
+        resultCreated = False
+        # colList element format: tableName^colName
+        schema = StructType([
+            StructField("colName", StringType(), True),
+            StructField("min", TimestampType(), True),
+            StructField("max", TimestampType(), True)])
+        for each in colList:
+            tableName, colName = each.split('^',1)
+            filename = tableName + '_time_metadata.csv'
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
+                if not resultCreated:
+                    newDf = currentTable.where(currentTable.colName==colName)
+                    resultCreated = True
+                else:
+                    newDf = newDf.union(currentTable.where(currentTable.colName==colName))
         resultDf = newDf.select(["colName","min","max"])
         return resultDf
     
