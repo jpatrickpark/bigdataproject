@@ -158,11 +158,11 @@ class TableCollections:
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
                 currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
                 if not resultCreated:
-                    newDf = currentTable.where(currentTable.colName==colName)
+                    newDf = currentTable.where(currentTable.colName==colName).withColumn("tableName", f.lit(tableName))
                     resultCreated = True
                 else:
-                    newDf = newDf.union(currentTable.where(currentTable.colName==colName))
-        resultDf = newDf.select(["colName","min","max"])
+                    newDf = newDf.union(currentTable.where(currentTable.colName==colName).withColumn("tableName", f.lit(tableName)))
+        resultDf = newDf.select(["tableName","colName","min","max"])
         return resultDf
     
     def getTimeRange(self, colList):
@@ -176,13 +176,14 @@ class TableCollections:
             tableName, colName = each.split('^',1)
             filename = tableName + '_time_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                #print(tableName)
                 currentTable = self.spark.read.csv(filename,header=False,schema=schema, sep='^')
                 if not resultCreated:
-                    newDf = currentTable.where(currentTable.colName==colName)
+                    newDf = currentTable.where(currentTable.colName==colName).withColumn("tableName", f.lit(tableName))
                     resultCreated = True
                 else:
-                    newDf = newDf.union(currentTable.where(currentTable.colName==colName))
-        resultDf = newDf.select(["colName","min","max"])
+                    newDf = newDf.union(currentTable.where(currentTable.colName==colName).withColumn("tableName", f.lit(tableName)))
+        resultDf = newDf.select(["tableName","colName","min","max"])
         return resultDf
     
     def returnIntersecWithinCols(self,colList):
