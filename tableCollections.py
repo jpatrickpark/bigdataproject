@@ -321,3 +321,58 @@ class TableCollections:
                     newDf = newDf.union(currentTable.where(currentTable.col_name==colName))
         resultDf = newDf.groupBy(newDf.col_name).count()
         return resultDf
+
+    def getColsOfDatatype(self, df, coltype):
+        
+        # Clean up column names so that we can prevent future errors
+        for colName, dtype in df.dtypes:
+            if '.' in colName or '`' in colName or colName.strip() != colName:
+                df = df.withColumnRenamed(colName, colName.strip().replace(".", "").replace("`", ""))
+
+        time_cols, string_cols, bool_cols, num_cols = []
+
+        # put column names into appropriate bin
+        for colName, dtype in df.dtypes:
+            if dtype == 'timestamp':
+                time_cols.append(colName)
+            elif dtype == 'string':
+                string_cols.append(colName)
+            elif dtype == 'boolean':
+                bool_cols.append(colName)
+            else:
+                num_cols.append(colName)
+
+        if(coltype != 'all'):
+            if(coltype == 'string' or coltype == 'String'):
+                if(string_cols):
+                    print("Columns of data type String are: ",string_cols)
+            elif(coltype == 'int' or coltype == 'Integer'):
+                if(num_cols):
+                    print("Columns of data type Integer are: ",string_cols)
+            elif(coltype == 'boolean' or coltype == 'Boolean'):
+                if(bool_cols):
+                    print("Columns of data type Boolean are: ",bool_cols)
+            elif(coltype == 'time' or coltype == 'Time'):
+                if(time_cols):
+                    print("Columns of data type Time are: ",time_cols)
+        else:
+            if(string_cols != []):
+                print("Columns of data type String are: ",string_cols)
+            else:
+                print("There are no string columns")
+
+            if(num_cols != []):
+                print("Columns of data type Integer are: ",string_cols)
+            else:
+                print("There are no Integer columns")
+
+            if(bool_cols != []):
+                    print("Columns of data type Boolean are: ",bool_cols)
+            else:
+                print("There are no Boolean columns")
+            
+            if(time_cols != []):
+                print("Columns of data type Time are: ",time_cols)
+            else:
+                print("There are no Time columns")
+
