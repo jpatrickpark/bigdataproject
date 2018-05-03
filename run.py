@@ -34,4 +34,4 @@ if __name__ == '__main__':
 
     columnsB = ["parking^vehicle_color", "parking^vehicle_make"]
     tc.colsWithAndWithout(columnsB, ["FORD"], ["GREEN"]) ## returns parking^vehicle_make
-    tc.colsWithAndWithout(columnsB, ["FOR/D", "TOYOTA"], ["GREEN"]) ## returns empty result ("TOYOT" is in the column but not "TOYOTA")
+    tc.colsWithAndWithout(columnsB, ["FORD", "TOYOTA"], ["GREEN"]) ## returns empty result ("TOYOT" is in the column but not "TOYOTA")
