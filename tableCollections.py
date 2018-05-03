@@ -264,6 +264,21 @@ class TableCollections:
         resultDf = newDf.sort(f.desc("cnt")).limit(topN)
         return resultDf
 
+    def returnOutliers(self, colList, percentage):
+        result = []
+        for each in colList:
+            tableName, colName = each.split('^', 1)
+            filename = tableName + '_string_metadata.csv'
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
+                newDf = currentTable.where(currentTable.col_name==colName)
+                numRows = newDf.count()
+                numOutliers = round(numRows * percentage)
+                newDf = newDf.sort(f.asc("cnt")).limit(numOutliers)
+                result.append(newDf)
+        for df in result:
+            df.show()
+
     # A function that takes two lists of column values list A and list B as
     # input and returns a list of table_name, column_name of columns where all
     # the elements in A are present but any of the elements in B are not present.

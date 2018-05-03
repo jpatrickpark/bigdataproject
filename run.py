@@ -30,7 +30,8 @@ if __name__ == '__main__':
     tc.returnIntersecWithinCols(columnsA).show()
     tc.frequentVals(columnsA, 10).show()
     tc.getCardinality(columnsA).show()
+    tc.returnOutliers(columnsA, 0.02)
 
     columnsB = ["parking^vehicle_color", "parking^vehicle_make"]
     tc.colsWithAndWithout(columnsB, ["FORD"], ["GREEN"]) ## returns parking^vehicle_make
-    tc.colsWithAndWithout(columnsB, ["FORD", "TOYOTA"], ["GREEN"]) ## returns empty result ("TOYOT" is in the column but not "TOYOTA")
+    tc.colsWithAndWithout(columnsB, ["FOR/D", "TOYOTA"], ["GREEN"]) ## returns empty result ("TOYOT" is in the column but not "TOYOTA")
