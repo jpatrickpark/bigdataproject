@@ -29,6 +29,7 @@ if __name__ == '__main__':
     columnsA = ["parking^plate_id", "open^plate"]
     tc.returnIntersecWithinCols(columnsA).show()
     tc.frequentVals(columnsA, 10).show()
+    tc.getCardinality(columnsA).show()
 
     columnsB = ["parking^vehicle_color", "parking^vehicle_make"]
     tc.colsWithAndWithout(columnsB, ["FORD"], ["GREEN"]) ## returns parking^vehicle_make
