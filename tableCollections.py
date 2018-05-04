@@ -8,6 +8,8 @@ from pyspark.sql import functions as f
 from collections import defaultdict
 import datetime
 from pyspark.sql.types import StructType, StructField, IntegerType, DoubleType, TimestampType, StringType
+from nltk.corpus import wordnet as wn
+import pandas as pd
 
 class TableCollections:
     def __init__(self,spark,sc):
