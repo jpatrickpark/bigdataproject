@@ -434,3 +434,10 @@ class TableCollections:
                     cnt += 1
             result_df = result_df[result_df['Path Similarity(Between 0 to 1)'] > 0.5]
             return result_df
+    
+    def countNullColumns(self, df):
+        names = df.schema.names
+        result_df = pd.DataFrame(index = names,columns = ['Null Values'])
+        for name in names:
+            result_df.loc[name] =  df.where(df[name].isNull()).count()
+        return result_df
