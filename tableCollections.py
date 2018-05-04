@@ -321,3 +321,114 @@ class TableCollections:
                     newDf = newDf.union(currentTable.where(currentTable.col_name==colName))
         resultDf = newDf.groupBy(newDf.col_name).count()
         return resultDf
+
+    def getColsOfDatatype(self, df, coltype):
+        
+        # Clean up column names so that we can prevent future errors
+        for colName, dtype in df.dtypes:
+            if '.' in colName or '`' in colName or colName.strip() != colName:
+                df = df.withColumnRenamed(colName, colName.strip().replace(".", "").replace("`", ""))
+
+        time_cols, string_cols, bool_cols, num_cols = []
+
+        # put column names into appropriate bin
+        for colName, dtype in df.dtypes:
+            if dtype == 'timestamp':
+                time_cols.append(colName)
+            elif dtype == 'string':
+                string_cols.append(colName)
+            elif dtype == 'boolean':
+                bool_cols.append(colName)
+            else:
+                num_cols.append(colName)
+
+        if(coltype != 'all'):
+            if(coltype == 'string' or coltype == 'String'):
+                if(string_cols):
+                    print("Columns of data type String are: ",string_cols)
+            elif(coltype == 'int' or coltype == 'Integer'):
+                if(num_cols):
+                    print("Columns of data type Integer are: ",string_cols)
+            elif(coltype == 'boolean' or coltype == 'Boolean'):
+                if(bool_cols):
+                    print("Columns of data type Boolean are: ",bool_cols)
+            elif(coltype == 'time' or coltype == 'Time'):
+                if(time_cols):
+                    print("Columns of data type Time are: ",time_cols)
+        else:
+            if(string_cols != []):
+                print("Columns of data type String are: ",string_cols)
+            else:
+                print("There are no string columns")
+
+            if(num_cols != []):
+                print("Columns of data type Integer are: ",string_cols)
+            else:
+                print("There are no Integer columns")
+
+            if(bool_cols != []):
+                    print("Columns of data type Boolean are: ",bool_cols)
+            else:
+                print("There are no Boolean columns")
+            
+            if(time_cols != []):
+                print("Columns of data type Time are: ",time_cols)
+            else:
+                print("There are no Time columns")
+
+    def colsOfcategory(self, df, category = None, df2=None):
+        # Clean up column names so that we can prevent future errors
+        for colName, dtype in df.dtypes:
+            if '.' in colName or '`' in colName or colName.strip() != colName:
+                df = df.withColumnRenamed(colName, colName.strip().replace(".", "", "_").replace("`", ""))
+        if(df2 == None):
+
+            result_df = pd.DataFrame(columns= ['Column_1','Path Similarity(Between 0 to 1)'])
+            category_sys = wn.synsets(category)
+            if(category_sys != []):
+                cnt = 0
+                # put column names into appropriate bin
+                for colName, dtype in df.dtypes:
+                    colName_ = colName.split("_")
+                    for i in range(len(colName_)):
+                        score = []
+                        colName_sys = wn.synsets(colName_[i])
+                        if(colName_sys != []):
+                            score.append(colName_sys[0].path_similarity(category_sys[0]))
+                    if(score != []):
+                        score = max(score)
+                    else:
+                        score = "Simlarity cannot be calculated"
+                    result_df.loc[cnt] = [colName, score]
+                    cnt += 1
+            else:
+                print("Similarity cannot be calculated")
+            result_df = result_df[result_df['Path Similarity(Between 0 to 1)'] > 0.5]
+            return result_df
+        else:
+            for colName, dtype in df2.dtypes:
+                if '.' in colName or '`' in colName or colName.strip() != colName:
+                    df2 = df2.withColumnRenamed(colName, colName.strip().replace(".", "", "_").replace("`", ""))
+            result_df = pd.DataFrame(columns= ['Column_1', 'Column_2','Path Similarity(Between 0 to 1)'])
+            cnt = 0
+            # put column names into appropriate bin
+            for colName1, dtype in df.dtypes:
+                colName_1 = colName1.split("_")
+                for colName2, dtype2 in df2.dtypes:
+                    colName_2 = colName2.split("_")
+                    score = []
+                    #print(colName_1, colName_2, score)
+                    for i in range(len(colName_1)):
+                        colName_sys_1 = wn.synsets(colName_1[i])
+                        for j in range(len(colName_2)):
+                            colName_sys_2 = wn.synsets(colName_2[j])
+                            if(colName_sys_1 != [] and colName_sys_2 != []):
+                                score.append(colName_sys_1[0].path_similarity(colName_sys_2[0]))
+                    if(score != []):
+                        score = max(score)
+                    else:
+                        score = "Simlarity cannot be calculated"
+                    result_df.loc[cnt] = [colName1, colName2, score]
+                    cnt += 1
+            result_df = result_df[result_df['Path Similarity(Between 0 to 1)'] > 0.5]
+            return result_df
