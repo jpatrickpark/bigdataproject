@@ -72,17 +72,17 @@ class TableCollections:
 
         # For each datatype of columns, process metadata
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
-        	self.createNumMetadata(df, num_cols, numFileName)
-        	self.createBoolMetadata(df, bool_cols, numFileName)
+            self.createNumMetadata(df, num_cols, numFileName)
+            self.createBoolMetadata(df, bool_cols, numFileName)
         else:
             print("num metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)):
-        	self.createTimeMetadata(df, time_cols, timeFileName)
+            self.createTimeMetadata(df, time_cols, timeFileName)
         else:
             print("timestamp metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
             pass
-        	self.createStringMetadata(name, string_cols)
+            self.createStringMetadata(name, string_cols)
         else:
             print("string metadata file exists for table {}".format(name))
 
@@ -477,7 +477,7 @@ class TableCollections:
             return time_cols, string_cols, bool_cols, num_cols
 
     def colsNameSimilarity(self, df, category = None, df2=None):
-    	"""
+        """
             :param df: A Spark Dataframe 
             :param category: A string keyword to match
             :df2 : A second dataframe to match column names 
