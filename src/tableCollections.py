@@ -10,7 +10,7 @@ import datetime
 from pyspark.sql.types import StructType, StructField, IntegerType, DoubleType, TimestampType, StringType
 from nltk.corpus import wordnet as wn
 import pandas as pd
-    
+
 class TableCollections:
 
     def __init__(self,spark,sc):
@@ -20,15 +20,15 @@ class TableCollections:
         #A list that has all the tables that have been registers and have metadata
         self.tableNames = []
         self.fs = self.sc._jvm.org.apache.hadoop.fs.FileSystem.get(sc._jsc.hadoopConfiguration())
-    
+
     #adding newly registered table to tableNames list
     def add_registered_table_name(self, name):
-        
+
         """
-            :param name: name of table given by the user 
+            :param name: name of table given by the user
             :return: True if Meta data files are registered else false
         """
-        
+
         numFileName = name + "_num_metadata.csv"
         timeFileName = name + "_time_metadata.csv"
         stringFileName = name + "_string_metadata.csv"
@@ -38,13 +38,13 @@ class TableCollections:
             self.tableNames.append(name)
             return True
         return False
-    
+
     #creates metadata depending on the datatype
     def register(self, df, name):
-        """ 
+        """
             :param df: spark dataframe
-            :param name: name of table given by the user 
-            
+            :param name: name of table given by the user
+
         """
         # Clean up column names so that we can prevent future errors
         for colName, dtype in df.dtypes:
@@ -87,11 +87,11 @@ class TableCollections:
             print("string metadata file exists for table {}".format(name))
 
     def createBoolMetadata(self, df, bool_cols, bool_filename):
-        """ 
+        """
             :param df: spark dataframe
             :param bool_cols: list of boolean columns in dataframe
             :param name: name of metadata file to be created
-            
+
         """
         for colName in bool_cols:
             minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
@@ -99,8 +99,8 @@ class TableCollections:
                     (colName,float(minMax[0]),float(minMax[1]))]).toDF(["colName","min","max"])
             metaDf.write.save(path=bool_filename, header="false", format='csv', mode='append', sep = '^')
 
-    def createTimeMetadata(self, df, time_cols, time_filename):    
-        """ 
+    def createTimeMetadata(self, df, time_cols, time_filename):
+        """
             :param df: spark dataframe
             :param time_filename: list of boolean columns in dataframe
             :param name: name of metadata file to be created
@@ -113,21 +113,21 @@ class TableCollections:
             metaDf.write.save(path=time_filename, header="false", format='csv', mode='append', sep = '^')
 
     def createNumMetadata(self, df, num_cols, num_filename):
-        """ 
+        """
             :param df: spark dataframe
             :param num_cols: list of numerical columns in dataframe
             :param name: name of metadata file to be created
             Extracts the min and maximum value from numerical columns using describe function
-            
+
         """
         describeTable = df[num_cols].describe().collect()
         for colName in num_cols:
             metaDf = self.sc.parallelize([
                      (colName,float(describeTable[3][colName]),float(describeTable[4][colName]))]).toDF(["colName","min","max"])
             metaDf.write.save(path=num_filename, header="false", format='csv', mode='append', sep = '^')
-   
+
     def createStringMetadata(self, df, string_cols):
-        """ 
+        """
             :param df: spark dataframe
             :param string_cols: list of boolean columns in dataframe
             Extracts all the distinct value and count using group by operation
@@ -140,10 +140,10 @@ class TableCollections:
             x.coalesce(1).write.save(path = name, header= "true", mode = "append", format = "csv", sep = '^')
 
     def timeColWithinRange(self, minTime, maxTime):
-        """ 
+        """
             :param minTime: time value in a python datetime object
             :param maxTime: time value in a python datetime object
-            :return: A dataframe with date column names having overlapping range 
+            :return: A dataframe with date column names having overlapping range
         """
         resultCreated = False
         if type(minTime) != datetime.datetime or type(maxTime) != datetime.datetime:
@@ -167,12 +167,12 @@ class TableCollections:
         return resultDf
 
     def numColWithinRange(self, minNum, maxNum):
-        """ 
+        """
             Checks for overlapping value columns by comparing with min and max values in
             the metadata file.
             :param minNum: lower bound to range of type int, bigint, float, long
             :maxNum: upper bound to range of type int, bigint, float, long
-            :return resultDf: A dataframe with date column names having overlapping range 
+            :return resultDf: A dataframe with date column names having overlapping range
         """
         resultCreated = False
         if type(minNum) == datetime.datetime or \
@@ -201,10 +201,10 @@ class TableCollections:
         return resultDf
 
     def getNumRange(self,colList):
-        """ 
+        """
             Find the range of values of numerical data columns
-            :param colList: A list of column^tableName 
-            :return resultDF: dataframe with range lower and upper bound value of the column 
+            :param colList: A list of column^tableName
+            :return resultDF: dataframe with range lower and upper bound value of the column
         """
         resultCreated = False
         # colList element format: tableName^colName
@@ -226,10 +226,10 @@ class TableCollections:
         return resultDf
 
     def getTimeRange(self, colList):
-        """ 
+        """
             Find the range of values of temporal data columns
-            :param colList: A list of column^tableName 
-            :return resultDf: dataframe with range lower and upper bound value of the column 
+            :param colList: A list of column^tableName
+            :return resultDf: dataframe with range lower and upper bound value of the column
         """
         resultCreated = False
         # colList element format: tableName^colName
@@ -354,7 +354,7 @@ class TableCollections:
             Finds topN columns based on frequency from Metadata which has precalculated frequency
             of each column.
             :param colList: A list of tableName^colName
-            :param percentage: A float value 
+            :param percentage: A float value
             :return resultDF: column values and frequency of columns
         """
         result = []
@@ -364,10 +364,28 @@ class TableCollections:
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
                 currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
                 newDf = currentTable.where(currentTable.col_name==colName)
-                numRows = newDf.count()
+                numRows = newDf.agg(f.sum('cnt').alias('aggregate')).first().aggregate
+
+                # find the maximum number of outliers to fetch
                 numOutliers = round(numRows * percentage)
-                newDf = newDf.sort(f.asc("cnt")).limit(numOutliers)
+
+                # sort the dataframe in ascending order of frequency
+                newDf = newDf.sort(f.asc('cnt'))
+
+                # check how many rows to fetch
+                rows = newDf.rdd.collect()
+                rowLim = 0
+                aggSum = 0
+                for row in rows:
+                    if (aggSum + row['cnt']) < numOutliers:
+                        aggSum += row['cnt']
+                        rowLim += 1
+                    else:
+                        break
+                # fetch the first "rowLim" rows
+                newDf = newDf.limit(rowLim)
                 result.append(newDf)
+                
         for df in result:
             df.show()
 
@@ -376,8 +394,8 @@ class TableCollections:
     # the elements in A are present but any of the elements in B are not present.
     def colsWithAndWithout(self, colList, withList, withoutList):
         """
-           :param colList: A list having string argumenet tableName^ColumnName 
-           :param withList: A list with of keywords 
+           :param colList: A list having string argumenet tableName^ColumnName
+           :param withList: A list with of keywords
            :param withoutList: A list of keywords
            :output result : List of Columns that satify the conditon
         """
@@ -428,7 +446,7 @@ class TableCollections:
 
     def getColsOfDatatype(self, df, coltype):
         """
-            :param df: A Spark Dataframe 
+            :param df: A Spark Dataframe
             :param coltype: {'all', 'timestamp', 'string', 'boolean'}
             :return _col : List of columsn that satify coltype
         """
@@ -471,16 +489,16 @@ class TableCollections:
 
             if(bool_cols != []):
                 print("There are no Boolean columns")
-            
+
             if(time_cols != []):
                 print("There are no Time columns")
             return time_cols, string_cols, bool_cols, num_cols
 
     def colsNameSimilarity(self, df, category = None, df2=None):
         """
-            :param df: A Spark Dataframe 
+            :param df: A Spark Dataframe
             :param category: A string keyword to match
-            :df2 : A second dataframe to match column names 
+            :df2 : A second dataframe to match column names
             :return result_df : A dataframe having column_1, column_2, path similarity, levenshtein distance,soundex_equality
         """
         # Clean up column names so that we can prevent future errors
@@ -533,7 +551,7 @@ class TableCollections:
                         score = 0
                     result_df.loc[cnt] = [colName1, colName2, score]
                     cnt += 1
-        result_df = result_df[result_df['Path Similarity'] > 0.5]            
+        result_df = result_df[result_df['Path Similarity'] > 0.5]
         if(result_df.empty is not True):
             result_df = self.spark.createDataFrame(result_df)
             if(category is None):
@@ -546,7 +564,7 @@ class TableCollections:
                                                  f.levenshtein(result_df["Column_1"],f.lit(category)))
                 result_df = result_df.withColumn("soundex_equality", f.soundex(result_df["Column_1"]) ==\
                                                  f.soundex(f.lit(category)))
-            
+
         else:
             schema = StructType([
             StructField("Column_1", StringType(), True),
@@ -555,19 +573,19 @@ class TableCollections:
             StructField("soundex_equality", DoubleType(), True),])
             result_df = self.spark.createDataFrame(self.sc.emptyRDD(), schema=schema)
         return result_df
-    
-    
+
+
     def getColsofCategory(self, tableName, colList, category):
         result_df = pd.DataFrame(index = colList, columns = ["category", "IsSubset"])
         if(category in ['State_full', 'County', 'State_short', 'City']):
             if(tableName in self.tableNames and "category" in self.tableNames):
-                for i in colList:   
+                for i in colList:
                     cols = ["category^"+category, tableName+"^"+i]
                     result_insec = self.returnIntersecWithinCols(cols)
                     result_insec = result_insec.filter(result_insec['col_value'] != 'null')
                     if(result_insec.count() != 0):
                         print("Column values are a subset of {}".format(category))
-                        result_df.loc[i] = [category, True] 
+                        result_df.loc[i] = [category, True]
                     else:
                         print("Column values are not a subset of {}".format(category))
                         result_df.loc[i] = [category, False]
@@ -575,7 +593,7 @@ class TableCollections:
             print("Category does not exist. Data cannot be validated")
         result_df = self.spark.createDataFrame(result_df)
         return result_df
-    
+
     def countNullValues(self, table_col_list):
         """
             :param table_col_list:A nest list having list of [table, column]
@@ -595,11 +613,11 @@ class TableCollections:
                     count_val = x.select('cnt').collect()[0][0]
                     print(count_val)
                     result_df.loc[cnt] = [table, column, count_val]
-                    
+
                 except:
                     result_df.loc[cnt] = [table, column, 0]
                 cnt += 1
-        if(result_df.empty is False):        
+        if(result_df.empty is False):
             result_df = self.spark.createDataFrame(result_df)
         else:
             schema = StructType([
@@ -608,8 +626,8 @@ class TableCollections:
             StructField("Null Values", DoubleType(), True)])
             result_df = self.spark.createDataFrame(self.sc.emptyRDD(), schema=schema)
         return result_df
-    
-        
+
+
     def returnUnionWithinCols(self,colList):
         """
             Find the set of unique values common in two columns of different or same table
