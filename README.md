@@ -15,6 +15,15 @@ tc.numColWithinRange(-76, 70).show() # Use Class Method
 
 tc.query(“colsWithinRange -76, -70”).show() # Use Custom Query Language
 
+## Running the Program
+Test results on selected NYC Open Data samples:
+
+    tests/Test_all.ipynb.
+
+To run the program:
+
+    ./submit.sh
+
 ## Queries
 
 ### All Types
@@ -24,7 +33,7 @@ query. countNullValues “tablename”
 *	`colNameSimilarity` : Compares column names from two different tables and returns
 pairs of column names with their similarity
 query. colNameSimilarity “table1” “table2”
-* `getColsOfDatatype` : Returns columns whose datatype matches the given datatype. 
+* `getColsOfDatatype` : Returns columns whose datatype matches the given datatype.
 query. getColsOfDatatype “string”
 
 ### Numerical Types
@@ -37,7 +46,7 @@ defined as intersection over union greater than threshold
 ex. Find all columns whose values are similar to a latitude column
 query. similarCols nyc_2n4x_d97d^Latitude where iou >= 0.001​
 * `getRange` : Returns saved metadata for given columns
- 	ex. Find min and max values of the result of SimilarCols 
+ 	ex. Find min and max values of the result of SimilarCols
 query. getRange "nyc_2n4x_d97d^Latitude",
 "nyc_29km_avyc^latitude", "nyc_35f6_8qd2^Borough"
 
@@ -52,7 +61,7 @@ query. getCardinality [“column1”, “column2”]
 excludes given words
 ex. Check if ‘Brooklyn’ was misclassified as a city name
 query. colsWithAndWithout [“Brooklyn”], [“Manhattan”, “Queens”]
-* `frequentVals` : 
+* `frequentVals` :
 	Returns a list of column values that are top N frequent in the
 decreasing order of frequency
 ex. Check top 10 types of premises where complaints were
@@ -61,9 +70,7 @@ query. frequentVals [“column1”, “column2”], 10
 * `getColsofCategory`
 	Returns columns whose values are states, county, or city
 query. getColsofCategory “State_short”
-* `returnOutliers`: 
+* `returnOutliers`:
 	Returns column values that appears equal or less to the given
 threshold
 	query. returnOutliers [“column1”]
-
-
