@@ -81,7 +81,6 @@ class TableCollections:
         else:
             print("timestamp metadata file exists for table {}".format(name))
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
-            pass
             self.createStringMetadata(name, string_cols)
         else:
             print("string metadata file exists for table {}".format(name))
@@ -423,10 +422,13 @@ class TableCollections:
                             resultDf = resultDf.union(currentTable.where(currentTable.col_name==colName)\
                             .select(currentTable.col_name).withColumn("table_name", f.lit(tableName)))
         if not resultCreated:
-            print("No columns satisfy the constraints.")
+            resultSchema = StructType([
+                StructField("table_name", StringType(), True),
+                StructField("col_name", StringType(), True)])
+            return self.spark.createDataFrame(self.sc.emptyRDD(), resultSchema)
         else:
             resultDf = resultDf.dropDuplicates()
-            resultDf.show()
+            return resultDf
 
     def getCardinality(self, colList):
         """
