@@ -18,7 +18,7 @@ tc.query(“colsWithinRange -76, -70”).show() # Use Custom Query Language
 ## Running the Program
 Test results on selected NYC Open Data samples:
 
-    tests/Test_all.ipynb.
+    tests/Test_all.ipynb
 
 To run the program:
 
