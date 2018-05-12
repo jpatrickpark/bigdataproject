@@ -8,8 +8,8 @@ from pyspark.sql import functions as f
 from collections import defaultdict
 import datetime
 from pyspark.sql.types import StructType, StructField, IntegerType, DoubleType, TimestampType, StringType
-from nltk.corpus import wordnet as wn
-import pandas as pd
+# from nltk.corpus import wordnet as wn
+# import pandas as pd
 
 class TableCollections:
 
@@ -385,7 +385,7 @@ class TableCollections:
                 # fetch the first "rowLim" rows
                 newDf = newDf.limit(rowLim)
                 result.append(newDf)
-                
+
         for df in result:
             df.show()
 
@@ -399,14 +399,14 @@ class TableCollections:
            :param withoutList: A list of keywords
            :output result : List of Columns that satify the conditon
         """
-        result = []
+        resultCreated = False
+
         for each in colList:
             tableName, colName = each.split('^', 1)
             filename = tableName + '_string_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
                 currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
                 newDf = currentTable.where(currentTable.col_name==colName)
-
                 # check if any excluding words are in the column
                 if len(newDf.filter(f.col('col_value').isin(withoutList)).head(1)) == 0:
                     # check if all including words are in the column
@@ -415,12 +415,18 @@ class TableCollections:
                         if newDf.filter(newDf.col_value == word).count() > 0:
                             withCnt += 1
                     if withCnt == len(withList):
-                        result.append(each)
-        if len(result) == 0:
-            print("There are no columns that satisfies the condition")
+                        if not resultCreated:
+                            resultDf = currentTable.where(currentTable.col_name==colName)\
+                            .select(currentTable.col_name).withColumn("table_name", f.lit(tableName))
+                            resultCreated = True
+                        else:
+                            resultDf = resultDf.union(currentTable.where(currentTable.col_name==colName)\
+                            .select(currentTable.col_name).withColumn("table_name", f.lit(tableName)))
+        if not resultCreated:
+            print("No columns satisfy the constraints.")
         else:
-            print("tablename^columname that satisfies the condition are: ")
-            print(*result, sep = ", ")
+            resultDf = resultDf.dropDuplicates()
+            resultDf.show()
 
     def getCardinality(self, colList):
         """
@@ -494,159 +500,159 @@ class TableCollections:
                 print("There are no Time columns")
             return time_cols, string_cols, bool_cols, num_cols
 
-    def colsNameSimilarity(self, df, category = None, df2=None):
-        """
-            :param df: A Spark Dataframe
-            :param category: A string keyword to match
-            :df2 : A second dataframe to match column names
-            :return result_df : A dataframe having column_1, column_2, path similarity, levenshtein distance,soundex_equality
-        """
-        # Clean up column names so that we can prevent future errors
-        for colName, dtype in df.dtypes:
-            if '.' in colName or '`' in colName or colName.strip() != colName:
-                df = df.withColumnRenamed(colName, colName.strip().replace(".", "", "_").replace("`", ""))
-        if(df2 == None):
-            result_df = pd.DataFrame(columns= ['Column_1','Path Similarity'])
-            category_sys = wn.synsets(category)
-            if(category_sys != []):
-                cnt = 0
-                # put column names into appropriate bin
-                for colName, dtype in df.dtypes:
-                    colName_ = colName.split("_")
-                    score = []
-                    for i in range(len(colName_)):
-                        colName_sys = wn.synsets(colName_[i])
-                        if(colName_sys != []):
-                            score.append(colName_sys[0].path_similarity(category_sys[0]))
-                    if(score != []):
-                        score = max(score)
-                    else:
-                        score = 0
-                    result_df.loc[cnt] = [colName, score]
-                    cnt += 1
-            else:
-                print("Similarity cannot be calculated")
-        else:
-            for colName, dtype in df2.dtypes:
-                if '.' in colName or '`' in colName or colName.strip() != colName:
-                    df2 = df2.withColumnRenamed(colName, colName.strip().replace(".", "", "_").replace("`", ""))
-            result_df = pd.DataFrame(columns= ['Column_1', 'Column_2','Path Similarity'])
-            cnt = 0
-            # put column names into appropriate bin
-            for colName1, dtype in df.dtypes:
-                colName_1 = colName1.split("_")
-                for colName2, dtype2 in df2.dtypes:
-                    colName_2 = colName2.split("_")
-                    score = []
-                    #print(colName_1, colName_2, score)
-                    for i in range(len(colName_1)):
-                        colName_sys_1 = wn.synsets(colName_1[i])
-                        for j in range(len(colName_2)):
-                            colName_sys_2 = wn.synsets(colName_2[j])
-                            if(colName_sys_1 != [] and colName_sys_2 != []):
-                                score.append(colName_sys_1[0].path_similarity(colName_sys_2[0]))
-                    if(score != []):
-                        score = max(score)
-                    else:
-                        score = 0
-                    result_df.loc[cnt] = [colName1, colName2, score]
-                    cnt += 1
-        result_df = result_df[result_df['Path Similarity'] > 0.5]
-        if(result_df.empty is not True):
-            result_df = self.spark.createDataFrame(result_df)
-            if(category is None):
-                result_df = result_df.withColumn("levenshtein distance", f.levenshtein(result_df["Column_1"],\
-                                                                                       result_df["Column_2"]))
-                result_df = result_df.withColumn("soundex_equality", f.soundex(result_df["Column_1"]) ==\
-                                                 f.soundex(result_df["Column_2"]))
-            else:
-                result_df = result_df.withColumn("levenshtein distance", \
-                                                 f.levenshtein(result_df["Column_1"],f.lit(category)))
-                result_df = result_df.withColumn("soundex_equality", f.soundex(result_df["Column_1"]) ==\
-                                                 f.soundex(f.lit(category)))
-
-        else:
-            schema = StructType([
-            StructField("Column_1", StringType(), True),
-            StructField("Path Similarity", DoubleType(), True),
-            StructField("levenshtein distance", DoubleType(), True),
-            StructField("soundex_equality", DoubleType(), True),])
-            result_df = self.spark.createDataFrame(self.sc.emptyRDD(), schema=schema)
-        return result_df
-
-
-    def getColsofCategory(self, tableName, colList, category):
-        result_df = pd.DataFrame(index = colList, columns = ["category", "IsSubset"])
-        if(category in ['State_full', 'County', 'State_short', 'City']):
-            if(tableName in self.tableNames and "category" in self.tableNames):
-                for i in colList:
-                    cols = ["category^"+category, tableName+"^"+i]
-                    result_insec = self.returnIntersecWithinCols(cols)
-                    result_insec = result_insec.filter(result_insec['col_value'] != 'null')
-                    if(result_insec.count() != 0):
-                        print("Column values are a subset of {}".format(category))
-                        result_df.loc[i] = [category, True]
-                    else:
-                        print("Column values are not a subset of {}".format(category))
-                        result_df.loc[i] = [category, False]
-        else:
-            print("Category does not exist. Data cannot be validated")
-        result_df = self.spark.createDataFrame(result_df)
-        return result_df
-
-    def countNullValues(self, table_col_list):
-        """
-            :param table_col_list:A nest list having list of [table, column]
-            :return result_df: A dataframe Table name, Column name and Null Values
-        """
-        result_df = pd.DataFrame(columns = ['Table name','column name','Null Values'])
-        cnt = 0
-        for i in table_col_list:
-            table, column = i[0], i[1]
-            filename = table+'_string_metadata.csv'
-            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = self.spark.read.format('csv').\
-                options(header='true',inferschema='true', sep = '^').load(filename)
-                currentTable = currentTable.filter(currentTable["col_name"] == column)
-                x = currentTable.filter(currentTable["col_value"].isNull())
-                try:
-                    count_val = x.select('cnt').collect()[0][0]
-                    print(count_val)
-                    result_df.loc[cnt] = [table, column, count_val]
-
-                except:
-                    result_df.loc[cnt] = [table, column, 0]
-                cnt += 1
-        if(result_df.empty is False):
-            result_df = self.spark.createDataFrame(result_df)
-        else:
-            schema = StructType([
-            StructField("'Table name'", StringType(), True),
-            StructField("column name", StringType(), True),
-            StructField("Null Values", DoubleType(), True)])
-            result_df = self.spark.createDataFrame(self.sc.emptyRDD(), schema=schema)
-        return result_df
-
-
-    def returnUnionWithinCols(self,colList):
-        """
-            Find the set of unique values common in two columns of different or same table
-            from the Metadata by performing filtering and then a group by operation.
-            :param colList: A list of tableName^colName
-            :return resultDF: A distinct set of values in both the columns
-        """
-        resultCreated = False
-        # colList element format: tableName^colName
-        for each in colList:
-            tableName, colName = each.split('^',1);
-            filename = tableName + '_string_metadata.csv'
-            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
-                if not resultCreated:
-                    newDf = currentTable.where(currentTable.col_name==colName)
-                    resultCreated = True
-                else:
-                    newDf = newDf.union(currentTable.where(currentTable.col_name==colName))
-        resultDf = newDf.groupBy(newDf.col_value).count()
-        resultDf = resultDf.dropDuplicates()
-        return resultDf
+    # def colsNameSimilarity(self, df, category = None, df2=None):
+    #     """
+    #         :param df: A Spark Dataframe
+    #         :param category: A string keyword to match
+    #         :df2 : A second dataframe to match column names
+    #         :return result_df : A dataframe having column_1, column_2, path similarity, levenshtein distance,soundex_equality
+    #     """
+    #     # Clean up column names so that we can prevent future errors
+    #     for colName, dtype in df.dtypes:
+    #         if '.' in colName or '`' in colName or colName.strip() != colName:
+    #             df = df.withColumnRenamed(colName, colName.strip().replace(".", "", "_").replace("`", ""))
+    #     if(df2 == None):
+    #         result_df = pd.DataFrame(columns= ['Column_1','Path Similarity'])
+    #         category_sys = wn.synsets(category)
+    #         if(category_sys != []):
+    #             cnt = 0
+    #             # put column names into appropriate bin
+    #             for colName, dtype in df.dtypes:
+    #                 colName_ = colName.split("_")
+    #                 score = []
+    #                 for i in range(len(colName_)):
+    #                     colName_sys = wn.synsets(colName_[i])
+    #                     if(colName_sys != []):
+    #                         score.append(colName_sys[0].path_similarity(category_sys[0]))
+    #                 if(score != []):
+    #                     score = max(score)
+    #                 else:
+    #                     score = 0
+    #                 result_df.loc[cnt] = [colName, score]
+    #                 cnt += 1
+    #         else:
+    #             print("Similarity cannot be calculated")
+    #     else:
+    #         for colName, dtype in df2.dtypes:
+    #             if '.' in colName or '`' in colName or colName.strip() != colName:
+    #                 df2 = df2.withColumnRenamed(colName, colName.strip().replace(".", "", "_").replace("`", ""))
+    #         result_df = pd.DataFrame(columns= ['Column_1', 'Column_2','Path Similarity'])
+    #         cnt = 0
+    #         # put column names into appropriate bin
+    #         for colName1, dtype in df.dtypes:
+    #             colName_1 = colName1.split("_")
+    #             for colName2, dtype2 in df2.dtypes:
+    #                 colName_2 = colName2.split("_")
+    #                 score = []
+    #                 #print(colName_1, colName_2, score)
+    #                 for i in range(len(colName_1)):
+    #                     colName_sys_1 = wn.synsets(colName_1[i])
+    #                     for j in range(len(colName_2)):
+    #                         colName_sys_2 = wn.synsets(colName_2[j])
+    #                         if(colName_sys_1 != [] and colName_sys_2 != []):
+    #                             score.append(colName_sys_1[0].path_similarity(colName_sys_2[0]))
+    #                 if(score != []):
+    #                     score = max(score)
+    #                 else:
+    #                     score = 0
+    #                 result_df.loc[cnt] = [colName1, colName2, score]
+    #                 cnt += 1
+    #     result_df = result_df[result_df['Path Similarity'] > 0.5]
+    #     if(result_df.empty is not True):
+    #         result_df = self.spark.createDataFrame(result_df)
+    #         if(category is None):
+    #             result_df = result_df.withColumn("levenshtein distance", f.levenshtein(result_df["Column_1"],\
+    #                                                                                    result_df["Column_2"]))
+    #             result_df = result_df.withColumn("soundex_equality", f.soundex(result_df["Column_1"]) ==\
+    #                                              f.soundex(result_df["Column_2"]))
+    #         else:
+    #             result_df = result_df.withColumn("levenshtein distance", \
+    #                                              f.levenshtein(result_df["Column_1"],f.lit(category)))
+    #             result_df = result_df.withColumn("soundex_equality", f.soundex(result_df["Column_1"]) ==\
+    #                                              f.soundex(f.lit(category)))
+    #
+    #     else:
+    #         schema = StructType([
+    #         StructField("Column_1", StringType(), True),
+    #         StructField("Path Similarity", DoubleType(), True),
+    #         StructField("levenshtein distance", DoubleType(), True),
+    #         StructField("soundex_equality", DoubleType(), True),])
+    #         result_df = self.spark.createDataFrame(self.sc.emptyRDD(), schema=schema)
+    #     return result_df
+    #
+    #
+    # def getColsofCategory(self, tableName, colList, category):
+    #     result_df = pd.DataFrame(index = colList, columns = ["category", "IsSubset"])
+    #     if(category in ['State_full', 'County', 'State_short', 'City']):
+    #         if(tableName in self.tableNames and "category" in self.tableNames):
+    #             for i in colList:
+    #                 cols = ["category^"+category, tableName+"^"+i]
+    #                 result_insec = self.returnIntersecWithinCols(cols)
+    #                 result_insec = result_insec.filter(result_insec['col_value'] != 'null')
+    #                 if(result_insec.count() != 0):
+    #                     print("Column values are a subset of {}".format(category))
+    #                     result_df.loc[i] = [category, True]
+    #                 else:
+    #                     print("Column values are not a subset of {}".format(category))
+    #                     result_df.loc[i] = [category, False]
+    #     else:
+    #         print("Category does not exist. Data cannot be validated")
+    #     result_df = self.spark.createDataFrame(result_df)
+    #     return result_df
+    #
+    # def countNullValues(self, table_col_list):
+    #     """
+    #         :param table_col_list:A nest list having list of [table, column]
+    #         :return result_df: A dataframe Table name, Column name and Null Values
+    #     """
+    #     result_df = pd.DataFrame(columns = ['Table name','column name','Null Values'])
+    #     cnt = 0
+    #     for i in table_col_list:
+    #         table, column = i[0], i[1]
+    #         filename = table+'_string_metadata.csv'
+    #         if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+    #             currentTable = self.spark.read.format('csv').\
+    #             options(header='true',inferschema='true', sep = '^').load(filename)
+    #             currentTable = currentTable.filter(currentTable["col_name"] == column)
+    #             x = currentTable.filter(currentTable["col_value"].isNull())
+    #             try:
+    #                 count_val = x.select('cnt').collect()[0][0]
+    #                 print(count_val)
+    #                 result_df.loc[cnt] = [table, column, count_val]
+    #
+    #             except:
+    #                 result_df.loc[cnt] = [table, column, 0]
+    #             cnt += 1
+    #     if(result_df.empty is False):
+    #         result_df = self.spark.createDataFrame(result_df)
+    #     else:
+    #         schema = StructType([
+    #         StructField("'Table name'", StringType(), True),
+    #         StructField("column name", StringType(), True),
+    #         StructField("Null Values", DoubleType(), True)])
+    #         result_df = self.spark.createDataFrame(self.sc.emptyRDD(), schema=schema)
+    #     return result_df
+    #
+    #
+    # def returnUnionWithinCols(self,colList):
+    #     """
+    #         Find the set of unique values common in two columns of different or same table
+    #         from the Metadata by performing filtering and then a group by operation.
+    #         :param colList: A list of tableName^colName
+    #         :return resultDF: A distinct set of values in both the columns
+    #     """
+    #     resultCreated = False
+    #     # colList element format: tableName^colName
+    #     for each in colList:
+    #         tableName, colName = each.split('^',1);
+    #         filename = tableName + '_string_metadata.csv'
+    #         if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+    #             currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
+    #             if not resultCreated:
+    #                 newDf = currentTable.where(currentTable.col_name==colName)
+    #                 resultCreated = True
+    #             else:
+    #                 newDf = newDf.union(currentTable.where(currentTable.col_name==colName))
+    #     resultDf = newDf.groupBy(newDf.col_value).count()
+    #     resultDf = resultDf.dropDuplicates()
+    #     return resultDf
