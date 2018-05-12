@@ -385,7 +385,7 @@ class TableCollections:
                 # fetch the first "rowLim" rows
                 newDf = newDf.limit(rowLim)
                 result.append(newDf)
-                
+
         for df in result:
             df.show()
 
@@ -399,14 +399,14 @@ class TableCollections:
            :param withoutList: A list of keywords
            :output result : List of Columns that satify the conditon
         """
-        result = []
+        resultCreated = False
+
         for each in colList:
             tableName, colName = each.split('^', 1)
             filename = tableName + '_string_metadata.csv'
             if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
                 currentTable = self.spark.read.format('csv').options(header='true',inferschema='true', sep = '^').load(filename)
                 newDf = currentTable.where(currentTable.col_name==colName)
-
                 # check if any excluding words are in the column
                 if len(newDf.filter(f.col('col_value').isin(withoutList)).head(1)) == 0:
                     # check if all including words are in the column
@@ -415,12 +415,18 @@ class TableCollections:
                         if newDf.filter(newDf.col_value == word).count() > 0:
                             withCnt += 1
                     if withCnt == len(withList):
-                        result.append(each)
-        if len(result) == 0:
-            print("There are no columns that satisfies the condition")
+                        if not resultCreated:
+                            resultDf = currentTable.where(currentTable.col_name==colName)\
+                            .select(currentTable.col_name).withColumn("table_name", f.lit(tableName))
+                            resultCreated = True
+                        else:
+                            resultDf = resultDf.union(currentTable.where(currentTable.col_name==colName)\
+                            .select(currentTable.col_name).withColumn("table_name", f.lit(tableName)))
+        if not resultCreated:
+            print("No columns satisfy the constraints.")
         else:
-            print("tablename^columname that satisfies the condition are: ")
-            print(*result, sep = ", ")
+            resultDf = resultDf.dropDuplicates()
+            resultDf.show()
 
     def getCardinality(self, colList):
         """
