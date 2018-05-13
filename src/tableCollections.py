@@ -614,20 +614,19 @@ class TableCollections:
         for i in table_col_list:
             table, column = i[0], i[1]
             filename = table+'_string_metadata.csv'
-            print(filename)
-            #if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-            currentTable = self.spark.read.format('csv').\
-            options(header='true',inferschema='true', sep = '^').load(filename)
-            currentTable = currentTable.filter(currentTable["col_name"] == column)
-            x = currentTable.filter(currentTable["col_value"].isNull())
-            try:
-                count_val = x.select('cnt').collect()[0][0]
-                #print(count_val)
-                result_df.loc[cnt] = [table, column, count_val]
+            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+                currentTable = self.spark.read.format('csv').\
+                options(header='true',inferschema='true', sep = '^').load(filename)
+                currentTable = currentTable.filter(currentTable["col_name"] == column)
+                x = currentTable.filter(currentTable["col_value"].isNull())
+                try:
+                    count_val = x.select('cnt').collect()[0][0]
+                    #print(count_val)
+                    result_df.loc[cnt] = [table, column, count_val]
 
-            except:
-                result_df.loc[cnt] = [table, column, 0]
-            cnt += 1
+                except:
+                    result_df.loc[cnt] = [table, column, 0]
+                cnt += 1
         if(result_df.empty is False):
             result_df = self.spark.createDataFrame(result_df)
         else:
