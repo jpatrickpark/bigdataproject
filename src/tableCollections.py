@@ -388,9 +388,7 @@ class TableCollections:
         for df in result:
             df.show()
 
-    # A function that takes two lists of column values list A and list B as
-    # input and returns a list of table_name, column_name of columns where all
-    # the elements in A are present but any of the elements in B are not present.
+
     def colsWithAndWithout(self, colList, withList, withoutList):
         """
            :param colList: A list having string argumenet tableName^ColumnName
@@ -553,6 +551,7 @@ class TableCollections:
                             colName_sys_2 = wn.synsets(colName_2[j])
                             if(colName_sys_1 != [] and colName_sys_2 != []):
                                 score.append(colName_sys_1[0].path_similarity(colName_sys_2[0]))
+                    score = [i for i in score if i!=None]
                     if(score != []):
                         score = max(score)
                     else:
@@ -584,7 +583,7 @@ class TableCollections:
 
 
     def getColsofCategory(self, tableName, colList, category):
-        result_df = pd.DataFrame(index = colList, columns = ["category", "IsSubset"])
+        result_df = pd.DataFrame(index = colList, columns = ["tableName","colName", "category", "IsSubset"])
         if(category in ['State_full', 'County', 'State_short', 'City']):
             if(tableName in self.tableNames and "category" in self.tableNames):
                 for i in colList:
@@ -593,10 +592,10 @@ class TableCollections:
                     result_insec = result_insec.filter(result_insec['col_value'] != 'null')
                     if(result_insec.count() != 0):
                         print("Column values are a subset of {}".format(category))
-                        result_df.loc[i] = [category, True]
+                        result_df.loc[i] = [tableName,i,category, True]
                     else:
                         print("Column values are not a subset of {}".format(category))
-                        result_df.loc[i] = [category, False]
+                        result_df.loc[i] = [tableName,i,category, False]
         else:
             print("Category does not exist. Data cannot be validated")
         result_df = self.spark.createDataFrame(result_df)
@@ -619,7 +618,7 @@ class TableCollections:
                 x = currentTable.filter(currentTable["col_value"].isNull())
                 try:
                     count_val = x.select('cnt').collect()[0][0]
-                    print(count_val)
+                    #print(count_val)
                     result_df.loc[cnt] = [table, column, count_val]
 
                 except:
@@ -629,7 +628,7 @@ class TableCollections:
             result_df = self.spark.createDataFrame(result_df)
         else:
             schema = StructType([
-            StructField("'Table name'", StringType(), True),
+            StructField("Table name", StringType(), True),
             StructField("column name", StringType(), True),
             StructField("Null Values", DoubleType(), True)])
             result_df = self.spark.createDataFrame(self.sc.emptyRDD(), schema=schema)
