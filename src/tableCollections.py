@@ -46,47 +46,44 @@ class TableCollections:
             :param name: name of table given by the user
 
         """
-        if(self.add_registered_table_name(name) is False):
-            # Clean up column names so that we can prevent future errors
-            for colName, dtype in df.dtypes:
-                if '.' in colName or '`' in colName or colName.strip() != colName:
-                    df = df.withColumnRenamed(colName, colName.strip().replace(".", "").replace("`", ""))
+        # Clean up column names so that we can prevent future errors
+        for colName, dtype in df.dtypes:
+            if '.' in colName or '`' in colName or colName.strip() != colName:
+                df = df.withColumnRenamed(colName, colName.strip().replace(".", "").replace("`", ""))
 
-            # track down which tables have been registered to the class
-            self.tableNames.append(name)
-            numFileName = name + "_num_metadata.csv"
-            timeFileName = name + "_time_metadata.csv"
-            stringFileName = name + "_string_metadata.csv"
-            num_cols, time_cols, string_cols, bool_cols = [], [], [], []
-            df.createOrReplaceTempView(name) # can be problematic
+        # track down which tables have been registered to the class
+        self.tableNames.append(name)
+        numFileName = name + "_num_metadata.csv"
+        timeFileName = name + "_time_metadata.csv"
+        stringFileName = name + "_string_metadata.csv"
+        num_cols, time_cols, string_cols, bool_cols = [], [], [], []
+        df.createOrReplaceTempView(name) # can be problematic
 
-            # put column names into appropriate bin
-            for colName, dtype in df.dtypes:
-                if dtype == 'timestamp':
-                    time_cols.append(colName)
-                elif dtype == 'string':
-                    string_cols.append(colName)
-                elif dtype == 'boolean':
-                    bool_cols.append(colName)
-                else:
-                    num_cols.append(colName)
+        # put column names into appropriate bin
+        for colName, dtype in df.dtypes:
+            if dtype == 'timestamp':
+                time_cols.append(colName)
+            elif dtype == 'string':
+                string_cols.append(colName)
+            elif dtype == 'boolean':
+                bool_cols.append(colName)
+            else:
+                num_cols.append(colName)
 
-            # For each datatype of columns, process metadata
-            if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
-                self.createNumMetadata(df, num_cols, numFileName)
-                self.createBoolMetadata(df, bool_cols, numFileName)
-            else:
-                print("num metadata file exists for table {}".format(name))
-            if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)):
-                self.createTimeMetadata(df, time_cols, timeFileName)
-            else:
-                print("timestamp metadata file exists for table {}".format(name))
-            if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
-                self.createStringMetadata(name, string_cols)
-            else:
-                print("string metadata file exists for table {}".format(name))
+        # For each datatype of columns, process metadata
+        if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
+            self.createNumMetadata(df, num_cols, numFileName)
+            self.createBoolMetadata(df, bool_cols, numFileName)
         else:
-            print("Meta data already exists")
+            print("num metadata file exists for table {}".format(name))
+        if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)):
+            self.createTimeMetadata(df, time_cols, timeFileName)
+        else:
+            print("timestamp metadata file exists for table {}".format(name))
+        if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
+            self.createStringMetadata(name, string_cols)
+        else:
+            print("string metadata file exists for table {}".format(name))
 
     def createBoolMetadata(self, df, bool_cols, bool_filename):
         """
