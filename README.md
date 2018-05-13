@@ -1,4 +1,4 @@
-# bigdataproject
+# TableCollections
 ## Introduction
 Table Collections includes 11 queries for exploring data in various ways on single or multiple datasets even when the contents are unclear to the user. Metadata is generated only once when a dataset is loaded. When a query is called, it runs on pre-generated metadata. Columns within same table or columns from multiple tables can be compared. The queries have been tested on multiple sized data from NYC Open Data. (https://opendata.cityofnewyork.us/)
 
@@ -49,8 +49,7 @@ defined as intersection over union greater than threshold
 * `getCardinality` : Returns the number of unique values in the column
     * _ex._ Check how many types of violations were reported
     * _query._ getCardinality [“column1”, “column2”]
-* `colsWithAndWithout`: Returns a list of column names that includes given words and
-excludes given words
+* `colsWithAndWithout`: Returns a list of column names that includes given words and excludes given words
     * _ex._ Check if ‘Brooklyn’ was misclassified as a city name
     * _query._ colsWithAndWithout [“Brooklyn”], [“Manhattan”, “Queens”]
 * `frequentVals` : Returns a list of column values that are top N frequent in the decreasing order of frequency
