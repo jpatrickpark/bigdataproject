@@ -36,7 +36,7 @@ To run the program:
 * `similarCols` : Returns columns who are similar to the given column. Similarity is
 defined as intersection over union greater than threshold
     * _ex._ Find all columns whose values are similar to a latitude column
-    * _query._ similarCols("nyc_2n4x_d97d^Latitude",0.001​)
+    * _query._ similarCols("nyc_2n4x_d97d^Latitude", 0.001​)
 * `getRange` : Returns saved metadata for given columns
     * _ex._ Find min and max values of the result of SimilarCols
     * _query._ getRange(["nyc_2n4x_d97d^Latitude", "nyc_29km_avyc^latitude", "nyc_35f6_8qd2^Borough"])
@@ -50,7 +50,7 @@ defined as intersection over union greater than threshold
     * _query._ getCardinality([“column1”, “column2”])
 * `colsWithAndWithout`: Returns a list of column names that includes given words and excludes given words
     * _ex._ Check if ‘Brooklyn’ was misclassified as a city name
-    * _query._ colsWithAndWithout(["nyc_a8wp_rerh^CITY","nyc_easq_ubfe^CITY", "nyc_fbaw_uq4e^CITY"], ["Brooklyn"], ["Manhattan"])
+    * _query._ colsWithAndWithout(["nyc_a8wp_rerh^CITY", "nyc_easq_ubfe^CITY", "nyc_fbaw_uq4e^CITY"], ["Brooklyn"], ["Manhattan"])
 * `frequentVals` : Returns a list of column values that are top N frequent in the decreasing order of frequency
     * _ex._ Check top N types of premises where complaints were reported
     * _query._ frequentVals([“column1”, “column2”], topN)
