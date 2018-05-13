@@ -46,44 +46,47 @@ class TableCollections:
             :param name: name of table given by the user
 
         """
-        # Clean up column names so that we can prevent future errors
-        for colName, dtype in df.dtypes:
-            if '.' in colName or '`' in colName or colName.strip() != colName:
-                df = df.withColumnRenamed(colName, colName.strip().replace(".", "").replace("`", ""))
+        if(self.add_registered_table_name(name) is False):
+            # Clean up column names so that we can prevent future errors
+            for colName, dtype in df.dtypes:
+                if '.' in colName or '`' in colName or colName.strip() != colName:
+                    df = df.withColumnRenamed(colName, colName.strip().replace(".", "").replace("`", ""))
 
-        # track down which tables have been registered to the class
-        self.tableNames.append(name)
-        numFileName = name + "_num_metadata.csv"
-        timeFileName = name + "_time_metadata.csv"
-        stringFileName = name + "_string_metadata.csv"
-        num_cols, time_cols, string_cols, bool_cols = [], [], [], []
-        df.createOrReplaceTempView(name) # can be problematic
+            # track down which tables have been registered to the class
+            self.tableNames.append(name)
+            numFileName = name + "_num_metadata.csv"
+            timeFileName = name + "_time_metadata.csv"
+            stringFileName = name + "_string_metadata.csv"
+            num_cols, time_cols, string_cols, bool_cols = [], [], [], []
+            df.createOrReplaceTempView(name) # can be problematic
 
-        # put column names into appropriate bin
-        for colName, dtype in df.dtypes:
-            if dtype == 'timestamp':
-                time_cols.append(colName)
-            elif dtype == 'string':
-                string_cols.append(colName)
-            elif dtype == 'boolean':
-                bool_cols.append(colName)
+            # put column names into appropriate bin
+            for colName, dtype in df.dtypes:
+                if dtype == 'timestamp':
+                    time_cols.append(colName)
+                elif dtype == 'string':
+                    string_cols.append(colName)
+                elif dtype == 'boolean':
+                    bool_cols.append(colName)
+                else:
+                    num_cols.append(colName)
+
+            # For each datatype of columns, process metadata
+            if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
+                self.createNumMetadata(df, num_cols, numFileName)
+                self.createBoolMetadata(df, bool_cols, numFileName)
             else:
-                num_cols.append(colName)
-
-        # For each datatype of columns, process metadata
-        if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
-            self.createNumMetadata(df, num_cols, numFileName)
-            self.createBoolMetadata(df, bool_cols, numFileName)
+                print("num metadata file exists for table {}".format(name))
+            if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)):
+                self.createTimeMetadata(df, time_cols, timeFileName)
+            else:
+                print("timestamp metadata file exists for table {}".format(name))
+            if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
+                self.createStringMetadata(name, string_cols)
+            else:
+                print("string metadata file exists for table {}".format(name))
         else:
-            print("num metadata file exists for table {}".format(name))
-        if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(timeFileName)):
-            self.createTimeMetadata(df, time_cols, timeFileName)
-        else:
-            print("timestamp metadata file exists for table {}".format(name))
-        if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(stringFileName)):
-            self.createStringMetadata(name, string_cols)
-        else:
-            print("string metadata file exists for table {}".format(name))
+            print("Meta data already exists")
 
     def createBoolMetadata(self, df, bool_cols, bool_filename):
         """
@@ -388,9 +391,7 @@ class TableCollections:
         for df in result:
             df.show()
 
-    # A function that takes two lists of column values list A and list B as
-    # input and returns a list of table_name, column_name of columns where all
-    # the elements in A are present but any of the elements in B are not present.
+
     def colsWithAndWithout(self, colList, withList, withoutList):
         """
            :param colList: A list having string argumenet tableName^ColumnName
@@ -553,6 +554,7 @@ class TableCollections:
                             colName_sys_2 = wn.synsets(colName_2[j])
                             if(colName_sys_1 != [] and colName_sys_2 != []):
                                 score.append(colName_sys_1[0].path_similarity(colName_sys_2[0]))
+                    score = [i for i in score if i!=None]
                     if(score != []):
                         score = max(score)
                     else:
@@ -584,7 +586,7 @@ class TableCollections:
 
 
     def getColsofCategory(self, tableName, colList, category):
-        result_df = pd.DataFrame(index = colList, columns = ["category", "IsSubset"])
+        result_df = pd.DataFrame(index = colList, columns = ["tableName","colName", "category", "IsSubset"])
         if(category in ['State_full', 'County', 'State_short', 'City']):
             if(tableName in self.tableNames and "category" in self.tableNames):
                 for i in colList:
@@ -593,10 +595,10 @@ class TableCollections:
                     result_insec = result_insec.filter(result_insec['col_value'] != 'null')
                     if(result_insec.count() != 0):
                         print("Column values are a subset of {}".format(category))
-                        result_df.loc[i] = [category, True]
+                        result_df.loc[i] = [tableName,i,category, True]
                     else:
                         print("Column values are not a subset of {}".format(category))
-                        result_df.loc[i] = [category, False]
+                        result_df.loc[i] = [tableName,i,category, False]
         else:
             print("Category does not exist. Data cannot be validated")
         result_df = self.spark.createDataFrame(result_df)
@@ -612,24 +614,25 @@ class TableCollections:
         for i in table_col_list:
             table, column = i[0], i[1]
             filename = table+'_string_metadata.csv'
-            if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
-                currentTable = self.spark.read.format('csv').\
-                options(header='true',inferschema='true', sep = '^').load(filename)
-                currentTable = currentTable.filter(currentTable["col_name"] == column)
-                x = currentTable.filter(currentTable["col_value"].isNull())
-                try:
-                    count_val = x.select('cnt').collect()[0][0]
-                    print(count_val)
-                    result_df.loc[cnt] = [table, column, count_val]
+            print(filename)
+            #if self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(filename)):
+            currentTable = self.spark.read.format('csv').\
+            options(header='true',inferschema='true', sep = '^').load(filename)
+            currentTable = currentTable.filter(currentTable["col_name"] == column)
+            x = currentTable.filter(currentTable["col_value"].isNull())
+            try:
+                count_val = x.select('cnt').collect()[0][0]
+                #print(count_val)
+                result_df.loc[cnt] = [table, column, count_val]
 
-                except:
-                    result_df.loc[cnt] = [table, column, 0]
-                cnt += 1
+            except:
+                result_df.loc[cnt] = [table, column, 0]
+            cnt += 1
         if(result_df.empty is False):
             result_df = self.spark.createDataFrame(result_df)
         else:
             schema = StructType([
-            StructField("'Table name'", StringType(), True),
+            StructField("Table name", StringType(), True),
             StructField("column name", StringType(), True),
             StructField("Null Values", DoubleType(), True)])
             result_df = self.spark.createDataFrame(self.sc.emptyRDD(), schema=schema)
