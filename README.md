@@ -7,7 +7,6 @@ Table Collections includes 11 queries for exploring data in various ways on sing
     tc.register(openTable, "open") # Create Metadata for New Table
     tc.add_registered_table_name("parking") # Load Generated Metadata
     tc.numColWithinRange(-76, 70).show() # Use Class Method
-    tc.query(“colsWithinRange -76, -70”).show() # Use Custom Query Language
 
 ## Running the Program
 Test results on selected NYC Open Data samples:
