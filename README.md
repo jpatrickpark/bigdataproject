@@ -22,39 +22,39 @@ To run the program:
 ### All Types
 
 * `countNullValues` : Returns the number of null values in each column
-    * _query._ countNullValues “tablename”
+    * _query._ countNullValues("tablename")
 * `colNameSimilarity` : Compares column names from two different tables and returns pairs of column names with their similarity
-    * _query._ colNameSimilarity “table1” “table2”
+    * _query._ colNameSimilarity(“table1”, “table2”)
 * `getColsOfDatatype` : Returns columns whose datatype matches the input datatype
-    * _query._ getColsOfDatatype “string”
+    * _query._ getColsOfDatatype(“string”)
 
 ### Numerical Types
 
 * `colsWithinRange` : Returns columns whose values are within given range
     * _ex._ Find nyc longitude columns where their values are in (-76,-70)
-    * _query._ colsWithinRange -76, -70​
+    * _query._ colsWithinRange(-76, -70​)
 * `similarCols` : Returns columns who are similar to the given column. Similarity is
 defined as intersection over union greater than threshold
     * _ex._ Find all columns whose values are similar to a latitude column
-    * _query._ similarCols nyc_2n4x_d97d^Latitude where iou >= 0.001​
+    * _query._ similarCols("nyc_2n4x_d97d^Latitude", 0.001​)
 * `getRange` : Returns saved metadata for given columns
     * _ex._ Find min and max values of the result of SimilarCols
-    * _query._ getRange "nyc_2n4x_d97d^Latitude", "nyc_29km_avyc^latitude", "nyc_35f6_8qd2^Borough"
+    * _query._ getRange(["nyc_2n4x_d97d^Latitude", "nyc_29km_avyc^latitude", "nyc_35f6_8qd2^Borough"])
 
 ### Categorical Types
 * `intersectionWithinCols` : Returns column values that are present in every input columns
     * _ex._ Check if a person appears in multiple violation records
-    * _query._ intersectionWithinCols [“column1”, “column2”]
+    * _query._ intersectionWithinCols([“column1”, “column2”])
 * `getCardinality` : Returns the number of unique values in the column
     * _ex._ Check how many types of violations were reported
-    * _query._ getCardinality [“column1”, “column2”]
+    * _query._ getCardinality([“column1”, “column2”])
 * `colsWithAndWithout`: Returns a list of column names that includes given words and excludes given words
     * _ex._ Check if ‘Brooklyn’ was misclassified as a city name
-    * _query._ colsWithAndWithout [“Brooklyn”], [“Manhattan”, “Queens”]
+    * _query._ colsWithAndWithout(["nyc_a8wp_rerh^CITY", "nyc_easq_ubfe^CITY", "nyc_fbaw_uq4e^CITY"], ["Brooklyn"], ["Manhattan"])
 * `frequentVals` : Returns a list of column values that are top N frequent in the decreasing order of frequency
-    * _ex._ Check top 10 types of premises where complaints were reported
-    * _query._ frequentVals [“column1”, “column2”], 10
+    * _ex._ Check top N types of premises where complaints were reported
+    * _query._ frequentVals([“column1”, “column2”], topN)
 * `getColsofCategory`: Returns columns whose values are states, county, or city
-    * _query._ getColsofCategory “State_short”
-* `returnOutliers`: Returns column values that appears equal or less to the given threshold
-	* _query._ returnOutliers [“column1”]
+    * _query._ getColsofCategory("table", ["column1", "column2"], category= 'State_full')
+* `returnOutliers`: Returns column values that appears equal or less compared to the given threshold
+	* _query._ returnOutliers([“column1”, "column2"], threshold)
