@@ -14,19 +14,19 @@ import pandas as pd
 class TableCollections:
 
     def __init__(self,spark,sc):
-        #initializes spark and sql context
+        # initialize spark and sql context
         self.spark = spark
         self.sc = sc
-        #A list that has all the tables that have been registers and have metadata
+        # a list to store all the table names that have been registered and have metadata created
         self.tableNames = []
         self.fs = self.sc._jvm.org.apache.hadoop.fs.FileSystem.get(sc._jsc.hadoopConfiguration())
 
-    #adding newly registered table to tableNames list
+    # add newly registered table to tableNames list
     def add_registered_table_name(self, name):
 
         """
-            :param name: name of table given by the user
-            :return: True if Meta data files are registered else false
+            :param name: tableName given by the user
+            :return: True if metadata files are registered, else False
         """
 
         numFileName = name + "_num_metadata.csv"
@@ -39,14 +39,14 @@ class TableCollections:
             return True
         return False
 
-    #creates metadata depending on the datatype
+    # create metadata depending on the datatype -- timestamp, string, boolean
     def register(self, df, name):
         """
             :param df: spark dataframe
             :param name: name of table given by the user
 
         """
-        # Clean up column names so that we can prevent future errors
+        # clean up column names to prevent future errors
         for colName, dtype in df.dtypes:
             if '.' in colName or '`' in colName or colName.strip() != colName:
                 df = df.withColumnRenamed(colName, colName.strip().replace(".", "").replace("`", ""))
@@ -70,7 +70,7 @@ class TableCollections:
             else:
                 num_cols.append(colName)
 
-        # For each datatype of columns, process metadata
+        # for each datatype of columns, process metadata
         if not self.fs.exists(self.sc._jvm.org.apache.hadoop.fs.Path(numFileName)):
             self.createNumMetadata(df, num_cols, numFileName)
             self.createBoolMetadata(df, bool_cols, numFileName)
@@ -140,6 +140,7 @@ class TableCollections:
 
     def timeColWithinRange(self, minTime, maxTime):
         """
+            Returns columns whose values are within given time range.
             :param minTime: time value in a python datetime object
             :param maxTime: time value in a python datetime object
             :return: A dataframe with date column names having overlapping range
@@ -167,8 +168,7 @@ class TableCollections:
 
     def numColWithinRange(self, minNum, maxNum):
         """
-            Checks for overlapping value columns by comparing with min and max values in
-            the metadata file.
+            Returns columns whose values are within given number range.
             :param minNum: lower bound to range of type int, bigint, float, long
             :maxNum: upper bound to range of type int, bigint, float, long
             :return resultDf: A dataframe with date column names having overlapping range
@@ -201,7 +201,7 @@ class TableCollections:
 
     def getNumRange(self,colList):
         """
-            Find the range of values of numerical data columns
+            Find the range of values of numerical data columns.
             :param colList: A list of column^tableName
             :return resultDF: dataframe with range lower and upper bound value of the column
         """
@@ -226,7 +226,7 @@ class TableCollections:
 
     def getTimeRange(self, colList):
         """
-            Find the range of values of temporal data columns
+            Find the range of values of timestamp data columns.
             :param colList: A list of column^tableName
             :return resultDf: dataframe with range lower and upper bound value of the column
         """
@@ -252,7 +252,7 @@ class TableCollections:
 
     def getSimilarNumCols(self, tableColName, threshold=0):
         """
-            A function that compares the percentage overlap of two columns over a threshold
+            A function that compares the percentage overlap of two columns over a threshold.
             :param tableColName: A string having column^tableName
             :param threshold: A float value between 0 and 1 which determines the percentage
             overlap/intersection which the user expects
@@ -305,8 +305,7 @@ class TableCollections:
 
     def returnIntersecWithinCols(self,colList):
         """
-            Find the set of unique values common in two columns of different or same table
-            from the Metadata by performing filtering and then a group by operation.
+            Find the set of unique values common in two columns from different or same table.
             :param colList: A list of tableName^colName
             :return resultDF: A distinct set of values overlapping in both the columns
         """
@@ -328,8 +327,7 @@ class TableCollections:
 
     def frequentVals(self, colList, topN):
         """
-            Finds topN columns based on frequency from Metadata which has precalculated frequency
-            of each column.
+            Finds topN frequent column values of the input column.
             :param colList: A list of tableName^colName
             :return resultDF: column values and frequency of columns
         """
@@ -350,8 +348,7 @@ class TableCollections:
 
     def returnOutliers(self, colList, percentage):
         """
-            Finds topN columns based on frequency from Metadata which has precalculated frequency
-            of each column.
+            Returns column values that appears equal or less to the given threshold.
             :param colList: A list of tableName^colName
             :param percentage: A float value
             :return resultDF: column values and frequency of columns
@@ -391,6 +388,8 @@ class TableCollections:
 
     def colsWithAndWithout(self, colList, withList, withoutList):
         """
+            Returns a list of column names that includes given words and
+             excludes given words.
            :param colList: A list having string argumenet tableName^ColumnName
            :param withList: A list with of keywords
            :param withoutList: A list of keywords
@@ -430,7 +429,7 @@ class TableCollections:
 
     def getCardinality(self, colList):
         """
-            Finds the number of distinct values from the metadata files
+            Finds the number of distinct values in the given column(s).
             for categorical columns.
             :param colList: A list of tableName^colName
             :return resultDF: A dataframe having column names and number of distinct values
@@ -452,6 +451,7 @@ class TableCollections:
 
     def getColsOfDatatype(self, df, coltype):
         """
+            Returns columns whose values are states, county, or city.
             :param df: A Spark Dataframe
             :param coltype: {'all', 'timestamp', 'string', 'boolean'}
             :return _col : List of columsn that satify coltype
@@ -502,6 +502,8 @@ class TableCollections:
 
     def colsNameSimilarity(self, df, category = None, df2=None):
         """
+            Compares column names from two different tables and returns
+            pairs of column names with their similarity.
             :param df: A Spark Dataframe
             :param category: A string keyword to match
             :df2 : A second dataframe to match column names
@@ -583,6 +585,14 @@ class TableCollections:
 
 
     def getColsofCategory(self, tableName, colList, category):
+        """
+            Returns columns whose values are states, county, or city.
+            : param tableName: Name of a table
+            : param colList: A list of column names
+            : param category: 'State_full', 'County', 'State_short', 'City'
+            : return resut_df: A dataframe that consists of tableName, colName,
+             category, and IsSubset
+        """
         result_df = pd.DataFrame(index = colList, columns = ["tableName","colName", "category", "IsSubset"])
         if(category in ['State_full', 'County', 'State_short', 'City']):
             if(tableName in self.tableNames and "category" in self.tableNames):
@@ -603,7 +613,8 @@ class TableCollections:
 
     def countNullValues(self, table_col_list):
         """
-            :param table_col_list:A nest list having list of [table, column]
+            Returns the number of null values in each column.
+            :param table_col_list: A nest list having list of [table, column]
             :return result_df: A dataframe Table name, Column name and Null Values
         """
         result_df = pd.DataFrame(columns = ['Table name','column name','Null Values'])
@@ -637,8 +648,7 @@ class TableCollections:
 
     def returnUnionWithinCols(self,colList):
         """
-            Find the set of unique values common in two columns of different or same table
-            from the Metadata by performing filtering and then a group by operation.
+            Find the union set of unique column values present in input columns.
             :param colList: A list of tableName^colName
             :return resultDF: A distinct set of values in both the columns
         """
