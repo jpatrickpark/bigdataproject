@@ -1,4 +1,4 @@
-# bigdataproject
+# TableCollections
 ## Introduction
 Table Collections includes 11 queries for exploring data in various ways on single or multiple datasets even when the contents are unclear to the user
 Metadata is generated only once when a dataset is loaded
