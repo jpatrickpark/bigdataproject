@@ -93,10 +93,10 @@ class TableCollections:
 
         """
         for colName in bool_cols:
-            minMax = df.agg(f.min(df[colName]), f.max(df[colName])).collect()[0]
-            metaDf = self.sc.parallelize([
-                    (colName,float(minMax[0]),float(minMax[1]))]).toDF(["colName","min","max"])
-            metaDf.write.save(path=bool_filename, header="false", format='csv', mode='append', sep = '^')
+            query = "SELECT `{}` as col_value, count(*) as cnt FROM {} GROUP BY `{}`".format(colName, df, colName)
+            x = self.spark.sql(query)
+            x = x.withColumn("col_name", f.lit(colName))
+            x.coalesce(1).write.save(path = bool_filename, header= "true", mode = "append", format = "csv", sep = '^')
 
     def createTimeMetadata(self, df, time_cols, time_filename):
         """
